@@ -74,6 +74,19 @@ const GlobalStyles = () => (
     @keyframes shockLine { from { stroke-dashoffset:800; } to { stroke-dashoffset:0; } }
     .fade-up { animation: fadeUp 0.5s ease both; }
     .fade-in { animation: fadeIn 0.4s ease both; }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+      .roi-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
+      .roi-grid .roi-arrow { transform: rotate(90deg); margin: 0 auto; }
+      .roi-breakdown { grid-template-columns: 1fr !important; }
+      .roi-breakdown > div { grid-template-columns: 1fr !important; gap: 8px !important; text-align: left !important; }
+      .bottom-stats { grid-template-columns: 1fr !important; gap: 16px !important; }
+      .bottom-stats > div { border: none !important; padding: 16px 0 !important; border-bottom: 1px solid ${DS.colors.border} !important; }
+      .bottom-stats > div:last-child { border-bottom: none !important; }
+      .protocol-step { grid-template-columns: 48px 1fr !important; }
+      .protocol-step > div:last-child { display: none; }
+    }
   `}</style>
 );
 
@@ -278,15 +291,33 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
       <nav style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "16px clamp(20px, 5vw, 80px)",
+        padding: "12px clamp(16px, 4vw, 80px)",
         background: `${DS.colors.bg}ee`, backdropFilter: "blur(12px)",
         borderBottom: `1px solid ${DS.colors.border}`,
       }}>
         <DeFybLogo size={28} />
-        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          <span onClick={onClientLogin} style={{ fontSize: "13px", color: DS.colors.textMuted, cursor: "pointer" }}>Client Portal</span>
-          <span onClick={onLogin} style={{ fontSize: "13px", color: DS.colors.textMuted, cursor: "pointer" }}>Team →</span>
-          <Button primary small onClick={scrollToIntake}>Start Assessment</Button>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+          {[
+            { label: "ROI", id: "roi" },
+            { label: "Process", id: "protocol" },
+            { label: "FAQ", id: "faq" },
+          ].map((link) => (
+            <span
+              key={link.id}
+              onClick={() => document.getElementById(link.id)?.scrollIntoView({ behavior: "smooth" })}
+              style={{
+                fontSize: "13px", color: DS.colors.textMuted, cursor: "pointer",
+                padding: "6px 10px", borderRadius: DS.radius.sm,
+                transition: "color 0.2s",
+              }}
+              onMouseOver={(e) => e.target.style.color = DS.colors.text}
+              onMouseOut={(e) => e.target.style.color = DS.colors.textMuted}
+            >
+              {link.label}
+            </span>
+          ))}
+          <span onClick={onClientLogin} style={{ fontSize: "13px", color: DS.colors.textMuted, cursor: "pointer", padding: "6px 10px" }}>Portal</span>
+          <Button primary small onClick={scrollToIntake}>Start</Button>
         </div>
       </nav>
 
@@ -404,7 +435,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
           </SectionTitle>
 
           {/* SIMPLE PAY → GET */}
-          <div style={{
+          <div className="roi-grid" style={{
             display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: "32px",
             alignItems: "center", marginBottom: "48px",
           }}>
@@ -424,7 +455,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
             </Card>
 
             {/* ARROW */}
-            <div style={{
+            <div className="roi-arrow" style={{
               width: "56px", height: "56px", borderRadius: "50%",
               background: DS.colors.shock, display: "flex", alignItems: "center",
               justifyContent: "center", fontSize: "24px", boxShadow: DS.shadow.glow,
@@ -447,7 +478,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
           </div>
 
           {/* WHERE IT COMES FROM */}
-          <div style={{ marginBottom: "40px" }}>
+          <div className="roi-breakdown" style={{ marginBottom: "40px" }}>
             <div style={{
               fontSize: "13px", color: DS.colors.textMuted, marginBottom: "16px",
               textTransform: "uppercase", letterSpacing: "0.08em",
@@ -475,7 +506,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
           </div>
 
           {/* BOTTOM LINE */}
-          <div style={{
+          <div className="bottom-stats" style={{
             display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px",
             padding: "24px", background: DS.colors.bgCard, borderRadius: DS.radius.lg,
             border: `1px solid ${DS.colors.border}`,
@@ -501,7 +532,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
         </section>
 
         {/* PROTOCOL */}
-        <section style={{ padding: "80px 0" }}>
+        <section id="protocol" style={{ padding: "80px 0" }}>
           <SectionTitle sub="Six steps. First client to managed service in under 60 days.">
             The DeFyb Protocol
           </SectionTitle>
@@ -537,7 +568,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
         </section>
 
         {/* FAQ */}
-        <section style={{ padding: "80px 0" }}>
+        <section id="faq" style={{ padding: "80px 0" }}>
           <SectionTitle>Common questions</SectionTitle>
           <div style={{ display: "grid", gap: "12px", maxWidth: "700px" }}>
             {[

@@ -536,6 +536,40 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
           </div>
         </section>
 
+        {/* FAQ */}
+        <section style={{ padding: "80px 0" }}>
+          <SectionTitle>Common questions</SectionTitle>
+          <div style={{ display: "grid", gap: "12px", maxWidth: "700px" }}>
+            {[
+              {
+                q: "Does this work with my EHR?",
+                a: "Yes. We work with athenahealth, Epic, eClinicalWorks, NextGen, AdvancedMD, and most others. The AI tools integrate via existing EHR APIs or run alongside your workflow."
+              },
+              {
+                q: "How is this different from just buying the tools myself?",
+                a: "You could buy them yourself. Most practices do, and most implementations fail. We handle vendor selection, environment setup, staff training, workflow integration, and ongoing optimization. You get the results without the project management."
+              },
+              {
+                q: "What does it actually cost?",
+                a: "Tool costs vary by stack — typically $1,500–3,000/month for a 5-provider practice. DeFyb's service fee is on top of that. Total investment runs ~$146K/year for a full implementation. ROI is typically 4–7x in year one."
+              },
+              {
+                q: "How long until we see results?",
+                a: "Documentation time drops immediately — usually day one. Revenue impact (coding uplift, denial reduction) shows up in 30–60 days. Full ROI realized within 6–8 weeks of go-live."
+              },
+              {
+                q: "What if my staff resists the change?",
+                a: "They usually do, at first. That's why we start with Tuesday Transform — one day a week on the new stack. Staff sees the tools work, asks to expand. Change happens through proof, not mandate."
+              },
+            ].map((faq, i) => (
+              <Card key={i} style={{ padding: "20px 24px" }}>
+                <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "8px" }}>{faq.q}</div>
+                <div style={{ fontSize: "14px", color: DS.colors.textMuted, lineHeight: 1.6 }}>{faq.a}</div>
+              </Card>
+            ))}
+          </div>
+        </section>
+
         {/* INTAKE FORM */}
         <section ref={intakeRef} style={{ padding: "80px 0" }}>
           {submitted ? (
@@ -648,14 +682,33 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
           )}
         </section>
 
+        {/* CONTACT */}
+        <section style={{
+          padding: "48px 0", borderTop: `1px solid ${DS.colors.border}`,
+          display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "24px",
+        }}>
+          <div>
+            <div style={{ fontSize: "14px", color: DS.colors.textMuted, marginBottom: "4px" }}>
+              Rather just talk?
+            </div>
+            <a href="mailto:torey@defyb.com" style={{
+              fontFamily: DS.fonts.display, fontSize: "20px", color: DS.colors.shock,
+              textDecoration: "none",
+            }}>
+              torey@defyb.com
+            </a>
+          </div>
+          <Button primary onClick={scrollToIntake}>Start Assessment →</Button>
+        </section>
+
         {/* FOOTER */}
         <footer style={{
-          padding: "40px 0", borderTop: `1px solid ${DS.colors.border}`,
+          padding: "32px 0", borderTop: `1px solid ${DS.colors.border}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
           <DeFybLogo size={20} />
           <p style={{ fontSize: "12px", color: DS.colors.textDim }}>
-            Defying the death of private practice. Clinician-led. Vendor-neutral. Results-proven.
+            © 2026 DeFyb. Clinician-led. Vendor-neutral.
           </p>
         </footer>
       </div>

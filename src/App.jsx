@@ -1320,7 +1320,13 @@ const TeamDashboard = ({ onBack }) => {
 // APP SHELL
 // ============================================================
 export default function App() {
-  const [currentView, setCurrentView] = useState("public");
+  const [currentView, setCurrentView] = useState(() => {
+    // Check for ?team in URL for hidden team access
+    if (typeof window !== 'undefined' && window.location.search.includes('team')) {
+      return 'team';
+    }
+    return 'public';
+  });
 
   return (
     <>

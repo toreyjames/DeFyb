@@ -286,7 +286,24 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [form, setForm] = useState({});
+  const [logoClicks, setLogoClicks] = useState(0);
+  const logoClickTimer = useRef(null);
   const scrollToIntake = () => intakeRef.current?.scrollIntoView({ behavior: "smooth" });
+
+  const handleLogoClick = () => {
+    const newClicks = logoClicks + 1;
+    setLogoClicks(newClicks);
+
+    // Reset after 2 seconds of no clicks
+    clearTimeout(logoClickTimer.current);
+    logoClickTimer.current = setTimeout(() => setLogoClicks(0), 2000);
+
+    // 3 clicks = team access
+    if (newClicks >= 3) {
+      setLogoClicks(0);
+      onLogin();
+    }
+  };
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -352,7 +369,9 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
         background: `${DS.colors.bg}ee`, backdropFilter: "blur(12px)",
         borderBottom: `1px solid ${DS.colors.border}`,
       }}>
-        <DeFybLogo size={28} />
+        <div onClick={handleLogoClick} style={{ cursor: "pointer" }}>
+          <DeFybLogo size={28} />
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
           {[
             { label: "ROI", id: "roi" },

@@ -318,6 +318,21 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
         });
 
       if (insertError) throw insertError;
+
+      // Send notification email (fire and forget)
+      fetch('https://ijuhtxskfixsdqindcjd.supabase.co/functions/v1/notify-intake', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          contact_name: form.contact,
+          contact_email: form.email,
+          specialty: form.specialty,
+          provider_count: form.providers,
+          pain_points: form.pains,
+        }),
+      }).catch(console.error);
+
       setSubmitted(true);
     } catch (err) {
       console.error('Submission error:', err);

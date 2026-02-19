@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "./supabase";
+import { supabase, isSupabaseConfigured } from "./supabase";
 
 // ============================================================
 // DeFyb v4 — Unified Platform
@@ -292,6 +292,14 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
     setSubmitting(true);
     setError(null);
 
+    // Check if Supabase is configured
+    if (!isSupabaseConfigured()) {
+      console.error('Supabase not configured');
+      setError('Form submission is temporarily unavailable. Please email us directly at torey@defyb.com');
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const { error: insertError } = await supabase
         .from('practices')
@@ -313,7 +321,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
       setSubmitted(true);
     } catch (err) {
       console.error('Submission error:', err);
-      setError('Something went wrong. Please try again or email us directly.');
+      setError('Something went wrong. Please try again or email us directly at torey@defyb.com');
     } finally {
       setSubmitting(false);
     }

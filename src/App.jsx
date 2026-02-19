@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { supabase } from "./supabase";
 
 // ============================================================
 // DeFyb v4 — Unified Platform
@@ -282,8 +283,41 @@ const STAGES = [
 const PublicSite = ({ onLogin, onClientLogin }) => {
   const intakeRef = useRef(null);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
   const [form, setForm] = useState({});
   const scrollToIntake = () => intakeRef.current?.scrollIntoView({ behavior: "smooth" });
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const { error: insertError } = await supabase
+        .from('practices')
+        .insert({
+          name: form.name,
+          specialty: form.specialty,
+          ehr: form.ehr,
+          provider_count: form.providers,
+          contact_name: form.contact,
+          contact_email: form.email,
+          contact_phone: form.phone,
+          contact_role: form.role,
+          pain_points: form.pains || [],
+          success_definition: form.success,
+          stage: 'lead',
+        });
+
+      if (insertError) throw insertError;
+      setSubmitted(true);
+    } catch (err) {
+      console.error('Submission error:', err);
+      setError('Something went wrong. Please try again or email us directly.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div style={{ minHeight: "100vh" }}>
@@ -705,8 +739,21 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
                   />
                 </div>
 
-                <Button primary onClick={() => setSubmitted(true)} style={{ width: "100%" }}>
-                  ⚡ Submit Assessment Request
+                {error && (
+                  <div style={{
+                    padding: "12px 16px", marginBottom: "16px", borderRadius: DS.radius.sm,
+                    background: DS.colors.dangerDim, color: DS.colors.danger, fontSize: "13px",
+                  }}>
+                    {error}
+                  </div>
+                )}
+
+                <Button
+                  primary
+                  onClick={handleSubmit}
+                  style={{ width: "100%", opacity: submitting ? 0.7 : 1 }}
+                >
+                  {submitting ? "Submitting..." : "⚡ Submit Assessment Request"}
                 </Button>
               </Card>
             </>

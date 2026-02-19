@@ -399,107 +399,104 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
 
         {/* ROI SECTION */}
         <section id="roi" style={{ padding: "80px 0" }}>
-          <SectionTitle sub="Based on published clinical data. Conservative estimates.">
-            The ROI for a 5-provider practice
+          <SectionTitle>
+            The math for a 5-provider practice
           </SectionTitle>
 
-          {/* BEFORE / AFTER VISUAL */}
+          {/* SIMPLE PAY → GET */}
           <div style={{
-            display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: "24px",
-            alignItems: "stretch", marginBottom: "40px",
+            display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: "32px",
+            alignItems: "center", marginBottom: "48px",
           }}>
-            {/* BEFORE */}
-            <Card style={{ borderColor: DS.colors.danger + "44" }}>
+            {/* YOU PAY */}
+            <Card style={{ textAlign: "center", padding: "40px 32px" }}>
               <div style={{
-                fontFamily: DS.fonts.mono, fontSize: "11px", color: DS.colors.danger,
-                textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "16px",
-              }}>Before DeFyb</div>
-              {[
-                ["Doc time", "16 min/patient"],
-                ["Coding", "25-50% under-coded"],
-                ["Calls answered", "~55%"],
-                ["Denial rate", "8-12%"],
-                ["DME revenue", "$0 (sent out)"],
-                ["Prior auth", "14 hrs/wk manual"],
-                ["Providers home", "8-9 PM"],
-              ].map(([k, v], i) => (
-                <div key={i} style={{
-                  display: "flex", justifyContent: "space-between", padding: "6px 0",
-                  borderBottom: `1px solid ${DS.colors.border}`, fontSize: "13px",
-                }}>
-                  <span style={{ color: DS.colors.textMuted }}>{k}</span>
-                  <span style={{ color: DS.colors.danger, fontFamily: DS.fonts.mono, fontSize: "12px" }}>{v}</span>
-                </div>
-              ))}
+                fontSize: "12px", color: DS.colors.textMuted, textTransform: "uppercase",
+                letterSpacing: "0.1em", marginBottom: "12px",
+              }}>You pay</div>
+              <div style={{
+                fontFamily: DS.fonts.display, fontSize: "clamp(36px, 5vw, 48px)",
+                color: DS.colors.text, lineHeight: 1,
+              }}>$146K</div>
+              <div style={{ fontSize: "14px", color: DS.colors.textDim, marginTop: "8px" }}>
+                per year — tools + DeFyb service
+              </div>
             </Card>
 
             {/* ARROW */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "8px" }}>
-              <div style={{
-                width: "48px", height: "48px", borderRadius: "50%",
-                background: DS.colors.shock, display: "flex", alignItems: "center",
-                justifyContent: "center", fontSize: "20px", boxShadow: DS.shadow.glow,
-              }}>⚡</div>
-              <span style={{ fontFamily: DS.fonts.mono, fontSize: "10px", color: DS.colors.textDim }}>DeFyb</span>
-            </div>
+            <div style={{
+              width: "56px", height: "56px", borderRadius: "50%",
+              background: DS.colors.shock, display: "flex", alignItems: "center",
+              justifyContent: "center", fontSize: "24px", boxShadow: DS.shadow.glow,
+            }}>→</div>
 
-            {/* AFTER */}
-            <Card style={{ borderColor: DS.colors.vital + "44" }}>
+            {/* YOU GET */}
+            <Card style={{ textAlign: "center", padding: "40px 32px", borderColor: DS.colors.vital + "44" }}>
               <div style={{
-                fontFamily: DS.fonts.mono, fontSize: "11px", color: DS.colors.vital,
-                textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "16px",
-              }}>After DeFyb</div>
-              {[
-                ["Doc time", "~2 min/patient"],
-                ["Coding", "11-14% wRVU increase"],
-                ["Calls answered", "100%"],
-                ["Denial rate", "3-5%"],
-                ["DME revenue", "$3-10K/mo/provider"],
-                ["Prior auth", "Automated"],
-                ["Providers home", "5:30 PM"],
-              ].map(([k, v], i) => (
-                <div key={i} style={{
-                  display: "flex", justifyContent: "space-between", padding: "6px 0",
-                  borderBottom: `1px solid ${DS.colors.border}`, fontSize: "13px",
-                }}>
-                  <span style={{ color: DS.colors.textMuted }}>{k}</span>
-                  <span style={{ color: DS.colors.vital, fontFamily: DS.fonts.mono, fontSize: "12px" }}>{v}</span>
-                </div>
-              ))}
+                fontSize: "12px", color: DS.colors.vital, textTransform: "uppercase",
+                letterSpacing: "0.1em", marginBottom: "12px",
+              }}>You get</div>
+              <div style={{
+                fontFamily: DS.fonts.display, fontSize: "clamp(36px, 5vw, 48px)",
+                color: DS.colors.vital, lineHeight: 1,
+              }}>$600K–1.2M</div>
+              <div style={{ fontSize: "14px", color: DS.colors.textDim, marginTop: "8px" }}>
+                per year back — revenue + savings
+              </div>
             </Card>
           </div>
 
-          {/* DOLLAR IMPACT */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginBottom: "24px" }}>
-            <MetricCard label="Coding Uplift" value="$312-625K" sub="/year from accurate E/M coding" color={DS.colors.vital} />
-            <MetricCard label="DME Capture" value="$100-500K" sub="/year (specialty dependent)" color={DS.colors.vital} />
-            <MetricCard label="New Patients" value="$45K+" sub="/year from answered calls" color={DS.colors.vital} />
-            <MetricCard label="Denial Recovery" value="$60-96K" sub="/year from clean claims" color={DS.colors.vital} />
-            <MetricCard label="Staff Savings" value="$84-96K" sub="/year in FTEs not needed" color={DS.colors.warn} />
-            <MetricCard label="Total Stack Cost" value="$146K" sub="/year (tools + DeFyb service)" color={DS.colors.textMuted} />
+          {/* WHERE IT COMES FROM */}
+          <div style={{ marginBottom: "40px" }}>
+            <div style={{
+              fontSize: "13px", color: DS.colors.textMuted, marginBottom: "16px",
+              textTransform: "uppercase", letterSpacing: "0.08em",
+            }}>Where the return comes from</div>
+            <div style={{ display: "grid", gap: "2px" }}>
+              {[
+                { source: "Coding uplift", amount: "$312–625K", note: "Accurate E/M documentation = 11–14% wRVU increase" },
+                { source: "DME capture", amount: "$100–500K", note: "Bring braces/DME in-house instead of sending out" },
+                { source: "Denial recovery", amount: "$60–96K", note: "Pre-submission scrub + auto-appeal" },
+                { source: "New patients", amount: "$45K+", note: "AI phone agent answers 100% of calls" },
+                { source: "Staff savings", amount: "$84–96K", note: "Fewer FTEs needed for phones, auth, follow-up" },
+              ].map((row, i) => (
+                <div key={i} style={{
+                  display: "grid", gridTemplateColumns: "160px 120px 1fr",
+                  alignItems: "center", gap: "16px", padding: "14px 20px",
+                  background: DS.colors.bgCard,
+                  borderRadius: i === 0 ? `${DS.radius.md} ${DS.radius.md} 0 0` : i === 4 ? `0 0 ${DS.radius.md} ${DS.radius.md}` : "0",
+                }}>
+                  <span style={{ fontSize: "14px", fontWeight: 500 }}>{row.source}</span>
+                  <span style={{ fontFamily: DS.fonts.mono, fontSize: "14px", color: DS.colors.vital }}>{row.amount}</span>
+                  <span style={{ fontSize: "13px", color: DS.colors.textMuted }}>{row.note}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <Card style={{ background: `${DS.colors.vital}0a`, borderColor: `${DS.colors.vital}33` }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
-              <div>
-                <div style={{ fontFamily: DS.fonts.display, fontSize: "32px", color: DS.colors.vital }}>4-7x ROI</div>
-                <div style={{ color: DS.colors.textMuted, fontSize: "14px" }}>Year 1 return on total investment</div>
-              </div>
-              <div>
-                <div style={{ fontFamily: DS.fonts.display, fontSize: "32px", color: DS.colors.shock }}>6-8 weeks</div>
-                <div style={{ color: DS.colors.textMuted, fontSize: "14px" }}>Payback period</div>
-              </div>
-              <div>
-                <div style={{ fontFamily: DS.fonts.display, fontSize: "32px", color: DS.colors.blue }}>1-2 hrs/day</div>
-                <div style={{ color: DS.colors.textMuted, fontSize: "14px" }}>Given back per provider</div>
-              </div>
+          {/* BOTTOM LINE */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px",
+            padding: "24px", background: DS.colors.bgCard, borderRadius: DS.radius.lg,
+            border: `1px solid ${DS.colors.border}`,
+          }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontFamily: DS.fonts.display, fontSize: "28px", color: DS.colors.vital }}>4–7x</div>
+              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>return year 1</div>
             </div>
-          </Card>
+            <div style={{ textAlign: "center", borderLeft: `1px solid ${DS.colors.border}`, borderRight: `1px solid ${DS.colors.border}` }}>
+              <div style={{ fontFamily: DS.fonts.display, fontSize: "28px", color: DS.colors.shock }}>6–8 wks</div>
+              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>to payback</div>
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontFamily: DS.fonts.display, fontSize: "28px", color: DS.colors.blue }}>1–2 hrs</div>
+              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>back per provider/day</div>
+            </div>
+          </div>
 
-          <p style={{ fontSize: "12px", color: DS.colors.textDim, marginTop: "16px", maxWidth: "700px" }}>
-            Coding data: Riverside Health 11% wRVU increase (PMC); UCSF/JAMA Jan 2026 — RVUs up, no increase in denials;
-            Texas Oncology — diagnoses per encounter 3.0→4.1. DME data: Healio, Health Catalyst.
-            Note: Some payers (Cigna, Aetna) are auto-downcoding L4-5 E/M claims. DeFyb's documentation integrity and environment audit ensures notes survive audit.
+          <p style={{ fontSize: "11px", color: DS.colors.textDim, marginTop: "20px", maxWidth: "700px" }}>
+            Sources: Riverside Health 11% wRVU increase (PMC); UCSF/JAMA Jan 2026; Texas Oncology 3.0→4.1 diagnoses/encounter.
+            DME: Healio, Health Catalyst. Note: Some payers auto-downcode L4-5 E/M claims — DeFyb's environment audit ensures notes survive audit.
           </p>
         </section>
 

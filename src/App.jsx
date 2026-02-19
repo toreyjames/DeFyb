@@ -295,7 +295,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
     // Check if Supabase is configured
     if (!isSupabaseConfigured()) {
       console.error('Supabase not configured');
-      setError('Form submission is temporarily unavailable. Please email us directly at torey@defyb.com');
+      setError('Form submission is temporarily unavailable. Please email us directly at torey@defyb.org');
       setSubmitting(false);
       return;
     }
@@ -321,7 +321,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
       setSubmitted(true);
     } catch (err) {
       console.error('Submission error:', err);
-      setError('Something went wrong. Please try again or email us directly at torey@defyb.com');
+      setError('Something went wrong. Please try again or email us directly at torey@defyb.org');
     } finally {
       setSubmitting(false);
     }
@@ -777,11 +777,11 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
             <div style={{ fontSize: "14px", color: DS.colors.textMuted, marginBottom: "4px" }}>
               Rather just talk?
             </div>
-            <a href="mailto:torey@defyb.com" style={{
+            <a href="mailto:torey@defyb.org" style={{
               fontFamily: DS.fonts.display, fontSize: "20px", color: DS.colors.shock,
               textDecoration: "none",
             }}>
-              torey@defyb.com
+              torey@defyb.org
             </a>
           </div>
           <Button primary onClick={scrollToIntake}>Start Assessment →</Button>

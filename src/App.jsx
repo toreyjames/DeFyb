@@ -996,6 +996,63 @@ const ClientPortal = ({ onBack }) => {
 const TeamDashboard = ({ onBack }) => {
   const [view, setView] = useState("pipeline");
   const [selectedClient, setSelectedClient] = useState(null);
+  const [practices, setPractices] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPractices = async () => {
+      if (!isSupabaseConfigured()) {
+        // Fall back to sample data if Supabase not configured
+        setPractices(SAMPLE_CLIENTS);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('practices')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Transform Supabase data to match our component structure
+        const transformed = data.map((p, i) => ({
+          id: p.id,
+          name: p.name || 'Unnamed Practice',
+          providers: p.provider_count || '?',
+          ehr: p.ehr || 'Unknown',
+          stage: p.stage || 'lead',
+          score: null, // New leads won't have scores yet
+          specialty: p.specialty || 'Not specified',
+          contact: {
+            name: p.contact_name,
+            email: p.contact_email,
+            phone: p.contact_phone,
+            role: p.contact_role,
+          },
+          painPoints: p.pain_points || [],
+          successDefinition: p.success_definition,
+          metrics: {}, // Empty for new practices
+          stack: [], // Empty for new practices
+          notes: p.notes ? [{ date: new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), text: p.notes }] : [
+            { date: new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), text: 'Intake received via website.' }
+          ],
+          createdAt: p.created_at,
+        }));
+
+        setPractices(transformed);
+      } catch (err) {
+        console.error('Error fetching practices:', err);
+        // Fall back to sample data on error
+        setPractices(SAMPLE_CLIENTS);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPractices();
+  }, []);
 
   const views = [
     { key: "pipeline", label: "Pipeline" },
@@ -1023,11 +1080,10 @@ const TeamDashboard = ({ onBack }) => {
 
         {/* TOP STATS */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "10px", marginBottom: "24px" }}>
-          <MetricCard small label="Active Practices" value="5" color={DS.colors.vital} />
-          <MetricCard small label="In Pipeline" value="2" color={DS.colors.warn} />
-          <MetricCard small label="Monthly Recurring" value="$7.5K" color={DS.colors.vital} />
-          <MetricCard small label="This Month Revenue" value="$18.5K" color={DS.colors.shock} />
-          <MetricCard small label="Avg Health Score" value="79" color={DS.colors.blue} />
+          <MetricCard small label="Active Practices" value={practices.filter(p => p.stage === 'managed').length.toString()} color={DS.colors.vital} />
+          <MetricCard small label="In Pipeline" value={practices.filter(p => ['lead', 'assessment', 'implementation'].includes(p.stage)).length.toString()} color={DS.colors.warn} />
+          <MetricCard small label="Total Practices" value={practices.length.toString()} color={DS.colors.shock} />
+          <MetricCard small label="Leads" value={practices.filter(p => p.stage === 'lead').length.toString()} color={DS.colors.blue} />
         </div>
 
         {/* VIEW TOGGLE */}
@@ -1044,6 +1100,12 @@ const TeamDashboard = ({ onBack }) => {
 
         {/* PIPELINE VIEW */}
         {view === "pipeline" && !selectedClient && (
+          loading ? (
+            <div style={{ textAlign: "center", padding: "60px 0", color: DS.colors.textMuted }}>
+              <div style={{ fontSize: "24px", marginBottom: "12px", animation: "pulse 1.5s infinite" }}>⚡</div>
+              Loading practices...
+            </div>
+          ) : (
           <div className="fade-in" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px" }}>
             {STAGES.map((stage) => (
               <div key={stage.key}>
@@ -1055,11 +1117,11 @@ const TeamDashboard = ({ onBack }) => {
                   <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: stage.color }} />
                   {stage.label}
                   <span style={{ color: DS.colors.textDim, fontWeight: 400 }}>
-                    ({SAMPLE_CLIENTS.filter((c) => c.stage === stage.key).length})
+                    ({practices.filter((c) => c.stage === stage.key).length})
                   </span>
                 </div>
                 <div style={{ display: "grid", gap: "8px" }}>
-                  {SAMPLE_CLIENTS.filter((c) => c.stage === stage.key).map((c) => (
+                  {practices.filter((c) => c.stage === stage.key).map((c) => (
                     <div key={c.id} onClick={() => setSelectedClient(c)} style={{
                       padding: "14px 16px", background: DS.colors.bgCard,
                       border: `1px solid ${DS.colors.border}`, borderRadius: DS.radius.md,
@@ -1090,6 +1152,7 @@ const TeamDashboard = ({ onBack }) => {
               </div>
             ))}
           </div>
+          )
         )}
 
         {/* CLIENT DETAIL */}
@@ -1110,8 +1173,54 @@ const TeamDashboard = ({ onBack }) => {
               </div>
             </div>
 
+            {/* CONTACT INFO (for leads) */}
+            {selectedClient.contact?.email && (
+              <Card style={{ marginBottom: "16px" }}>
+                <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "12px" }}>Contact</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", fontSize: "13px" }}>
+                  {selectedClient.contact.name && (
+                    <div><span style={{ color: DS.colors.textMuted }}>Name:</span> {selectedClient.contact.name}</div>
+                  )}
+                  {selectedClient.contact.email && (
+                    <div><span style={{ color: DS.colors.textMuted }}>Email:</span> <a href={`mailto:${selectedClient.contact.email}`} style={{ color: DS.colors.shock }}>{selectedClient.contact.email}</a></div>
+                  )}
+                  {selectedClient.contact.phone && (
+                    <div><span style={{ color: DS.colors.textMuted }}>Phone:</span> {selectedClient.contact.phone}</div>
+                  )}
+                  {selectedClient.contact.role && (
+                    <div><span style={{ color: DS.colors.textMuted }}>Role:</span> {selectedClient.contact.role}</div>
+                  )}
+                </div>
+              </Card>
+            )}
+
+            {/* PAIN POINTS (for leads) */}
+            {selectedClient.painPoints?.length > 0 && (
+              <Card style={{ marginBottom: "16px" }}>
+                <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "12px" }}>Pain Points</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {selectedClient.painPoints.map((p, i) => (
+                    <span key={i} style={{
+                      padding: "4px 10px", background: DS.colors.shockGlow, border: `1px solid ${DS.colors.shock}`,
+                      borderRadius: DS.radius.sm, fontSize: "12px", color: DS.colors.shock,
+                    }}>{p}</span>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {/* SUCCESS DEFINITION */}
+            {selectedClient.successDefinition && (
+              <Card style={{ marginBottom: "16px" }}>
+                <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "8px" }}>What success looks like</div>
+                <div style={{ fontSize: "13px", color: DS.colors.textMuted, fontStyle: "italic" }}>
+                  "{selectedClient.successDefinition}"
+                </div>
+              </Card>
+            )}
+
             {/* METRICS */}
-            {selectedClient.metrics.docTime != null && (
+            {selectedClient.metrics?.docTime != null && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "10px", marginBottom: "24px" }}>
                 <MetricCard small label="Doc Time" value={`${selectedClient.metrics.docTime} min`} sub={`was ${selectedClient.metrics.docTimeBaseline}`} color={DS.colors.blue} />
                 <MetricCard small label="Revenue ↑" value={`$${(selectedClient.metrics.revenue / 1000).toFixed(0)}K/mo`} color={DS.colors.vital} />
@@ -1160,32 +1269,46 @@ const TeamDashboard = ({ onBack }) => {
         {/* ACTIVITY VIEW */}
         {view === "activity" && (
           <div className="fade-in">
-            <div style={{ display: "grid", gap: "6px" }}>
-              {[
-                { date: "Feb 18", client: "Riverside Pediatrics", action: "New intake received", type: "lead" },
-                { date: "Feb 17", client: "Summit Pain Mgmt", action: "Inbound from medical society talk", type: "lead" },
-                { date: "Feb 15", client: "Pine Valley Family Med", action: "Q1 scorecard — health score 84, zero pajama time", type: "managed" },
-                { date: "Feb 14", client: "Heartland Internal Med", action: "6-month scorecard delivered. 2 admin FTEs saved.", type: "managed" },
-                { date: "Feb 12", client: "Lakeside Orthopedics", action: "DME implementation underway. $2M/yr target.", type: "implementation" },
-                { date: "Jan 28", client: "Lakeside Orthopedics", action: "Tuesday Transform started. 3/8 providers active.", type: "implementation" },
-                { date: "Jan 10", client: "Pine Valley Family Med", action: "Expanded from Tuesday to full week. All 5 active.", type: "managed" },
-              ].map((item, i) => {
-                const stageInfo = STAGES.find((s) => s.key === item.type) || STAGES[0];
-                return (
-                  <div key={i} style={{
-                    display: "grid", gridTemplateColumns: "70px 8px 180px 1fr",
-                    alignItems: "center", gap: "12px", padding: "10px 16px",
-                    background: DS.colors.bgCard, borderRadius: DS.radius.sm,
-                    border: `1px solid ${DS.colors.border}`,
-                  }}>
-                    <span style={{ fontFamily: DS.fonts.mono, fontSize: "11px", color: DS.colors.textDim }}>{item.date}</span>
-                    <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: stageInfo.color }} />
-                    <span style={{ fontSize: "13px", fontWeight: 500 }}>{item.client}</span>
-                    <span style={{ fontSize: "13px", color: DS.colors.textMuted }}>{item.action}</span>
+            {loading ? (
+              <div style={{ textAlign: "center", padding: "60px 0", color: DS.colors.textMuted }}>
+                <div style={{ fontSize: "24px", marginBottom: "12px", animation: "pulse 1.5s infinite" }}>⚡</div>
+                Loading activity...
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: "6px" }}>
+                {practices
+                  .flatMap((p) => p.notes.map((note) => ({
+                    date: note.date,
+                    client: p.name,
+                    action: note.text,
+                    type: p.stage,
+                    sortDate: p.createdAt || new Date().toISOString(),
+                  })))
+                  .sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate))
+                  .slice(0, 20)
+                  .map((item, i) => {
+                    const stageInfo = STAGES.find((s) => s.key === item.type) || STAGES[0];
+                    return (
+                      <div key={i} style={{
+                        display: "grid", gridTemplateColumns: "70px 8px 180px 1fr",
+                        alignItems: "center", gap: "12px", padding: "10px 16px",
+                        background: DS.colors.bgCard, borderRadius: DS.radius.sm,
+                        border: `1px solid ${DS.colors.border}`,
+                      }}>
+                        <span style={{ fontFamily: DS.fonts.mono, fontSize: "11px", color: DS.colors.textDim }}>{item.date}</span>
+                        <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: stageInfo.color }} />
+                        <span style={{ fontSize: "13px", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.client}</span>
+                        <span style={{ fontSize: "13px", color: DS.colors.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.action}</span>
+                      </div>
+                    );
+                  })}
+                {practices.length === 0 && (
+                  <div style={{ textAlign: "center", padding: "40px 0", color: DS.colors.textMuted }}>
+                    No activity yet. Practices will appear here when they submit intakes.
                   </div>
-                );
-              })}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

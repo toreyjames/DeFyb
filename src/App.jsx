@@ -399,8 +399,8 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
 
         {/* ROI SECTION */}
         <section id="roi" style={{ padding: "80px 0" }}>
-          <SectionTitle>
-            The math for a 5-provider practice
+          <SectionTitle sub="Based on published clinical studies — your results will vary by specialty, payer mix, and current state.">
+            What the research shows for a 5-provider practice
           </SectionTitle>
 
           {/* SIMPLE PAY → GET */}
@@ -413,11 +413,11 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
               <div style={{
                 fontSize: "12px", color: DS.colors.textMuted, textTransform: "uppercase",
                 letterSpacing: "0.1em", marginBottom: "12px",
-              }}>You pay</div>
+              }}>Typical investment</div>
               <div style={{
                 fontFamily: DS.fonts.display, fontSize: "clamp(36px, 5vw, 48px)",
                 color: DS.colors.text, lineHeight: 1,
-              }}>$146K</div>
+              }}>~$146K</div>
               <div style={{ fontSize: "14px", color: DS.colors.textDim, marginTop: "8px" }}>
                 per year — tools + DeFyb service
               </div>
@@ -435,13 +435,13 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
               <div style={{
                 fontSize: "12px", color: DS.colors.vital, textTransform: "uppercase",
                 letterSpacing: "0.1em", marginBottom: "12px",
-              }}>You get</div>
+              }}>Potential return</div>
               <div style={{
                 fontFamily: DS.fonts.display, fontSize: "clamp(36px, 5vw, 48px)",
                 color: DS.colors.vital, lineHeight: 1,
-              }}>$600K–1.2M</div>
+              }}>$400K–1M+</div>
               <div style={{ fontSize: "14px", color: DS.colors.textDim, marginTop: "8px" }}>
-                per year back — revenue + savings
+                per year — based on published outcomes
               </div>
             </Card>
           </div>
@@ -451,14 +451,14 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
             <div style={{
               fontSize: "13px", color: DS.colors.textMuted, marginBottom: "16px",
               textTransform: "uppercase", letterSpacing: "0.08em",
-            }}>Where the return comes from</div>
+            }}>Where practices are seeing returns (published data)</div>
             <div style={{ display: "grid", gap: "2px" }}>
               {[
-                { source: "Coding uplift", amount: "$312–625K", note: "Accurate E/M documentation = 11–14% wRVU increase" },
-                { source: "DME capture", amount: "$100–500K", note: "Bring braces/DME in-house instead of sending out" },
-                { source: "Denial recovery", amount: "$60–96K", note: "Pre-submission scrub + auto-appeal" },
-                { source: "New patients", amount: "$45K+", note: "AI phone agent answers 100% of calls" },
-                { source: "Staff savings", amount: "$84–96K", note: "Fewer FTEs needed for phones, auth, follow-up" },
+                { source: "Coding uplift", amount: "up to $625K", note: "11–14% wRVU increase reported in JAMA, PMC studies" },
+                { source: "DME capture", amount: "varies widely", note: "Specialty-dependent — ortho/pain see the most" },
+                { source: "Denial recovery", amount: "$60–96K", note: "Industry avg 8–12% denial rate → 3–5% with AI scrub" },
+                { source: "Answered calls", amount: "$45K+", note: "Recovering patients lost to voicemail" },
+                { source: "Staff efficiency", amount: "$84–96K", note: "Reduced need for phone/auth/follow-up FTEs" },
               ].map((row, i) => (
                 <div key={i} style={{
                   display: "grid", gridTemplateColumns: "160px 120px 1fr",
@@ -481,12 +481,12 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
             border: `1px solid ${DS.colors.border}`,
           }}>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontFamily: DS.fonts.display, fontSize: "28px", color: DS.colors.vital }}>4–7x</div>
-              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>return year 1</div>
+              <div style={{ fontFamily: DS.fonts.display, fontSize: "28px", color: DS.colors.vital }}>3–5x</div>
+              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>typical ROI range</div>
             </div>
             <div style={{ textAlign: "center", borderLeft: `1px solid ${DS.colors.border}`, borderRight: `1px solid ${DS.colors.border}` }}>
-              <div style={{ fontFamily: DS.fonts.display, fontSize: "28px", color: DS.colors.shock }}>6–8 wks</div>
-              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>to payback</div>
+              <div style={{ fontFamily: DS.fonts.display, fontSize: "28px", color: DS.colors.shock }}>60–90 days</div>
+              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>to measurable impact</div>
             </div>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontFamily: DS.fonts.display, fontSize: "28px", color: DS.colors.blue }}>1–2 hrs</div>
@@ -495,8 +495,8 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
           </div>
 
           <p style={{ fontSize: "11px", color: DS.colors.textDim, marginTop: "20px", maxWidth: "700px" }}>
-            Sources: Riverside Health 11% wRVU increase (PMC); UCSF/JAMA Jan 2026; Texas Oncology 3.0→4.1 diagnoses/encounter.
-            DME: Healio, Health Catalyst. Note: Some payers auto-downcode L4-5 E/M claims — DeFyb's environment audit ensures notes survive audit.
+            Sources: Riverside Health (PMC); UCSF/JAMA Jan 2026; Texas Oncology; Healio; Health Catalyst.
+            These are industry benchmarks — we'll build a realistic projection specific to your practice during the assessment.
           </p>
         </section>
 
@@ -551,11 +551,11 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
               },
               {
                 q: "What does it actually cost?",
-                a: "Tool costs vary by stack — typically $1,500–3,000/month for a 5-provider practice. DeFyb's service fee is on top of that. Total investment runs ~$146K/year for a full implementation. ROI is typically 4–7x in year one."
+                a: "Tool costs vary by stack — typically $1,500–3,000/month for a 5-provider practice. DeFyb's service fee is on top of that. We'll give you a specific quote during the assessment based on what you actually need."
               },
               {
                 q: "How long until we see results?",
-                a: "Documentation time drops immediately — usually day one. Revenue impact (coding uplift, denial reduction) shows up in 30–60 days. Full ROI realized within 6–8 weeks of go-live."
+                a: "Documentation time typically drops immediately — usually day one. Revenue impact (coding uplift, denial reduction) takes longer to measure, usually 60–90 days to see clear trends."
               },
               {
                 q: "What if my staff resists the change?",

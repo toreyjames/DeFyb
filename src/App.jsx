@@ -1336,16 +1336,209 @@ const TeamDashboard = ({ onBack }) => {
 };
 
 // ============================================================
+// TEAM LOGIN
+// ============================================================
+const TeamLogin = ({ onLogin, onBack }) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    if (!isSupabaseConfigured()) {
+      setError("Authentication not configured");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) throw authError;
+      onLogin(data.user);
+    } catch (err) {
+      setError(err.message || "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Card style={{ width: "100%", maxWidth: "380px", margin: "20px" }}>
+        <div style={{ textAlign: "center", marginBottom: "24px" }}>
+          <DeFybLogo size={32} />
+          <div style={{
+            fontFamily: DS.fonts.mono, fontSize: "11px", color: DS.colors.shock,
+            marginTop: "8px", letterSpacing: "0.1em"
+          }}>
+            TEAM ACCESS
+          </div>
+        </div>
+
+        <form onSubmit={handleLogin}>
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{
+              display: "block", fontSize: "12px", color: DS.colors.textMuted,
+              marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em"
+            }}>
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              style={{
+                width: "100%", padding: "10px 12px", background: DS.colors.bg,
+                border: `1px solid ${DS.colors.borderLight}`, borderRadius: DS.radius.sm,
+                color: DS.colors.text, fontSize: "14px", outline: "none",
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: "20px" }}>
+            <label style={{
+              display: "block", fontSize: "12px", color: DS.colors.textMuted,
+              marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em"
+            }}>
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              style={{
+                width: "100%", padding: "10px 12px", background: DS.colors.bg,
+                border: `1px solid ${DS.colors.borderLight}`, borderRadius: DS.radius.sm,
+                color: DS.colors.text, fontSize: "14px", outline: "none",
+              }}
+            />
+          </div>
+
+          {error && (
+            <div style={{
+              padding: "10px 14px", marginBottom: "16px", borderRadius: DS.radius.sm,
+              background: DS.colors.dangerDim, color: DS.colors.danger, fontSize: "13px",
+            }}>
+              {error}
+            </div>
+          )}
+
+          <Button primary onClick={handleLogin} style={{ width: "100%", opacity: loading ? 0.7 : 1 }}>
+            {loading ? "Signing in..." : "Sign In"}
+          </Button>
+        </form>
+
+        <div style={{ textAlign: "center", marginTop: "20px" }}>
+          <span
+            onClick={onBack}
+            style={{ fontSize: "13px", color: DS.colors.textMuted, cursor: "pointer" }}
+          >
+            ← Back to site
+          </span>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+// ============================================================
 // APP SHELL
 // ============================================================
 export default function App() {
-  const [currentView, setCurrentView] = useState(() => {
-    // Check for ?team in URL for hidden team access
-    if (typeof window !== 'undefined' && window.location.search.includes('team')) {
-      return 'team';
+  const [currentView, setCurrentView] = useState("public");
+  const [teamUser, setTeamUser] = useState(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  // Check for existing session on mount
+  useEffect(() => {
+    const checkSession = async () => {
+      if (!isSupabaseConfigured()) {
+        setCheckingAuth(false);
+        return;
+      }
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setTeamUser(session.user);
+          // Check URL for team access intent
+          if (typeof window !== 'undefined' && window.location.search.includes('team')) {
+            setCurrentView('team');
+          }
+        }
+      } catch (err) {
+        console.error('Session check error:', err);
+      } finally {
+        setCheckingAuth(false);
+      }
+    };
+
+    checkSession();
+
+    // Listen for auth changes
+    if (isSupabaseConfigured()) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT') {
+          setTeamUser(null);
+          setCurrentView('public');
+        } else if (session?.user) {
+          setTeamUser(session.user);
+        }
+      });
+
+      return () => subscription?.unsubscribe();
     }
-    return 'public';
-  });
+  }, []);
+
+  const handleTeamLogin = (user) => {
+    setTeamUser(user);
+    setCurrentView('team');
+  };
+
+  const handleTeamLogout = async () => {
+    if (isSupabaseConfigured()) {
+      await supabase.auth.signOut();
+    }
+    setTeamUser(null);
+    setCurrentView('public');
+  };
+
+  const handleRequestTeamAccess = () => {
+    // If already logged in, go straight to dashboard
+    if (teamUser) {
+      setCurrentView('team');
+    } else {
+      setCurrentView('team-login');
+    }
+  };
+
+  if (checkingAuth) {
+    return (
+      <>
+        <FontLoader />
+        <GlobalStyles />
+        <div style={{
+          minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+          color: DS.colors.textMuted
+        }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: "32px", marginBottom: "12px", animation: "pulse 1.5s infinite" }}>⚡</div>
+            Loading...
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -1353,15 +1546,28 @@ export default function App() {
       <GlobalStyles />
       {currentView === "public" && (
         <PublicSite
-          onLogin={() => setCurrentView("team")}
+          onLogin={handleRequestTeamAccess}
           onClientLogin={() => setCurrentView("client")}
         />
       )}
       {currentView === "client" && (
         <ClientPortal onBack={() => setCurrentView("public")} />
       )}
+      {currentView === "team-login" && (
+        <TeamLogin
+          onLogin={handleTeamLogin}
+          onBack={() => setCurrentView("public")}
+        />
+      )}
       {currentView === "team" && (
-        <TeamDashboard onBack={() => setCurrentView("public")} />
+        teamUser ? (
+          <TeamDashboard onBack={handleTeamLogout} />
+        ) : (
+          <TeamLogin
+            onLogin={handleTeamLogin}
+            onBack={() => setCurrentView("public")}
+          />
+        )
       )}
     </>
   );

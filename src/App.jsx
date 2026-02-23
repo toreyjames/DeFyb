@@ -211,7 +211,7 @@ const FAILURE_POINTS = [
 ];
 
 const PROTOCOL_STEPS = [
-  { num: "01", title: "Intake", desc: "Practice fills a 20-minute form. We already know the diagnosis.", time: "20 min" },
+  { num: "01", title: "Intake", desc: "Practice fills a quick form. We already know the diagnosis.", time: "5 min" },
   { num: "02", title: "Confirm", desc: "Half-day audit + AI environment assessment. Room acoustics, device placement, workflow timing.", time: "½ day" },
   { num: "03", title: "Prove", desc: "Side-by-side parallel run on their own patients. Undeniable.", time: "1 day" },
   { num: "04", title: "Deliver", desc: "72-Hour Note. One page. Here's what's broken, here's the fix, here's the dollars.", time: "72 hrs" },
@@ -306,8 +306,23 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
   };
 
   const handleSubmit = async () => {
-    setSubmitting(true);
     setError(null);
+
+    // Validate required fields
+    const required = ['name', 'specialty', 'providers', 'contact', 'email'];
+    const missing = required.filter(key => !form[key]?.trim?.() && !form[key]);
+    if (missing.length > 0) {
+      setError('Please fill in all required fields (marked with *)');
+      return;
+    }
+
+    // Basic email validation
+    if (form.email && !form.email.includes('@')) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setSubmitting(true);
 
     // Check if Supabase is configured
     if (!isSupabaseConfigured()) {
@@ -692,24 +707,41 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
             </div>
           ) : (
             <>
-              <SectionTitle sub="20 minutes. We'll tell you exactly what's broken and what it's costing you.">
+              <SectionTitle sub="5 minutes. We'll tell you exactly what's broken and what it's costing you.">
                 Start your practice assessment
               </SectionTitle>
 
               <Card style={{ maxWidth: "700px" }}>
                 {[
-                  { label: "Practice Name", key: "name", type: "text" },
-                  { label: "Your Name", key: "contact", type: "text" },
-                  { label: "Your Role", key: "role", type: "select", options: ["Practice Owner / Partner", "Office Manager", "Provider (MD/DO/PA/NP)", "Billing Manager", "Other"] },
-                  { label: "Specialty", key: "specialty", type: "text", placeholder: "e.g., Family Medicine, Orthopedics, Pain Mgmt" },
-                  { label: "Number of Providers", key: "providers", type: "select", options: ["1-2", "3-5", "6-10", "11-20", "20+"] },
+                  // Practice Info (feeds baseline)
+                  { label: "Practice Name", key: "name", type: "text", required: true },
+                  { label: "Specialty", key: "specialty", type: "select", required: true, options: [
+                    "Family Medicine / Primary Care",
+                    "Internal Medicine",
+                    "Cardiology",
+                    "Gastroenterology",
+                    "Psychiatry / Behavioral Health",
+                    "Orthopedic Surgery",
+                    "OB/GYN",
+                    "Urology",
+                    "Endocrinology",
+                    "Dermatology",
+                    "Pediatrics",
+                    "Pain Management",
+                    "General Surgery",
+                    "Other"
+                  ]},
+                  { label: "Number of Providers", key: "providers", type: "select", required: true, options: ["1-2", "3-5", "6-10", "11-20", "20+"] },
                   { label: "Current EHR", key: "ehr", type: "select", options: ["athenahealth", "Epic", "eClinicalWorks", "NextGen", "AdvancedMD", "Allscripts/Veradigm", "Other / Not sure"] },
-                  { label: "Email", key: "email", type: "email" },
+                  // Contact Info
+                  { label: "Your Name", key: "contact", type: "text", required: true },
+                  { label: "Your Role", key: "role", type: "select", options: ["Practice Owner / Partner", "Office Manager", "Provider (MD/DO/PA/NP)", "Billing Manager", "Other"] },
+                  { label: "Email", key: "email", type: "email", required: true },
                   { label: "Phone", key: "phone", type: "tel" },
                 ].map((field) => (
                   <div key={field.key} style={{ marginBottom: "16px" }}>
                     <label style={{ display: "block", fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                      {field.label}
+                      {field.label}{field.required && <span style={{ color: DS.colors.shock }}> *</span>}
                     </label>
                     {field.type === "select" ? (
                       <select
@@ -767,10 +799,10 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
 
                 <div style={{ marginBottom: "24px" }}>
                   <label style={{ display: "block", fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                    What does success look like?
+                    What does "fixed" look like for you?
                   </label>
                   <textarea
-                    rows={3} placeholder="Providers leave by 5:30 · Stop losing new patients to voicemail · Stay independent without drowning · Bring DME in-house..."
+                    rows={2} placeholder="e.g., Providers home by 5:30, stop losing calls to voicemail..."
                     value={form.success || ""}
                     onChange={(e) => setForm({ ...form, success: e.target.value })}
                     style={{
@@ -1336,6 +1368,52 @@ const TeamDashboard = ({ onBack }) => {
 };
 
 // ============================================================
+// CLIENT LOGIN (placeholder until portal is wired up)
+// ============================================================
+const ClientLogin = ({ onBack }) => {
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Card style={{ width: "100%", maxWidth: "420px", margin: "20px", textAlign: "center" }}>
+        <div style={{ marginBottom: "24px" }}>
+          <DeFybLogo size={32} />
+        </div>
+
+        <h2 style={{ fontFamily: DS.fonts.display, fontSize: "24px", marginBottom: "12px" }}>
+          Client Portal
+        </h2>
+
+        <p style={{ color: DS.colors.textMuted, fontSize: "14px", marginBottom: "24px", lineHeight: 1.6 }}>
+          Your practice dashboard is being prepared. Once your assessment is complete,
+          you'll receive login credentials to access your live metrics, AI stack status,
+          and practice health score.
+        </p>
+
+        <div style={{
+          padding: "16px", background: DS.colors.bg, borderRadius: DS.radius.md,
+          marginBottom: "24px",
+        }}>
+          <div style={{ fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px" }}>
+            Questions?
+          </div>
+          <a href="mailto:torey@defyb.org" style={{
+            color: DS.colors.shock, textDecoration: "none", fontWeight: 500,
+          }}>
+            torey@defyb.org
+          </a>
+        </div>
+
+        <span
+          onClick={onBack}
+          style={{ fontSize: "13px", color: DS.colors.textMuted, cursor: "pointer" }}
+        >
+          ← Back to site
+        </span>
+      </Card>
+    </div>
+  );
+};
+
+// ============================================================
 // TEAM LOGIN
 // ============================================================
 const TeamLogin = ({ onLogin, onBack }) => {
@@ -1433,9 +1511,16 @@ const TeamLogin = ({ onLogin, onBack }) => {
             </div>
           )}
 
-          <Button primary onClick={handleLogin} style={{ width: "100%", opacity: loading ? 0.7 : 1 }}>
+          <button type="submit" style={{
+            width: "100%", padding: "12px 28px",
+            background: DS.colors.shock, color: "#fff",
+            border: "none", borderRadius: DS.radius.md,
+            cursor: "pointer", fontFamily: DS.fonts.body,
+            fontSize: "15px", fontWeight: 500, letterSpacing: "0.01em",
+            opacity: loading ? 0.7 : 1, transition: "all 0.2s ease",
+          }}>
             {loading ? "Signing in..." : "Sign In"}
-          </Button>
+          </button>
         </form>
 
         <div style={{ textAlign: "center", marginTop: "20px" }}>
@@ -1551,7 +1636,7 @@ export default function App() {
         />
       )}
       {currentView === "client" && (
-        <ClientPortal onBack={() => setCurrentView("public")} />
+        <ClientLogin onBack={() => setCurrentView("public")} />
       )}
       {currentView === "team-login" && (
         <TeamLogin

@@ -3983,8 +3983,8 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
             color: DS.colors.text, fontWeight: 400, lineHeight: 1.1, maxWidth: "700px",
             marginBottom: "24px",
           }}>
-            Your practice is <span style={{ color: DS.colors.shock, fontStyle: "italic" }}>flatlined</span> on admin.
-            <br />We bring it back.
+            Your revenue is <span style={{ color: DS.colors.shock, fontStyle: "italic" }}>leaking</span> in documentation.
+            <br />We capture it back.
           </h1>
 
           {/* THREE DOORS */}
@@ -4002,7 +4002,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
           </div>
 
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            <Button primary onClick={scrollToIntake}>Free Practice Assessment →</Button>
+            <Button primary onClick={scrollToIntake}>Revenue Capture Assessment →</Button>
             <Button onClick={() => document.getElementById("roi")?.scrollIntoView({ behavior: "smooth" })}>See the ROI</Button>
           </div>
         </section>
@@ -4016,10 +4016,10 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
             fontFamily: DS.fonts.display, fontSize: "clamp(20px, 3vw, 28px)",
             color: DS.colors.textMuted, fontStyle: "italic",
           }}>
-            Defying the death of private practice.
+            Capturing revenue private practices are underbilling.
           </p>
           <p style={{ fontSize: "14px", color: DS.colors.textDim, marginTop: "8px" }}>
-            Clinician-led AI implementation for small group practices.
+            Clinician-led billing intelligence and operational automation for small group practices.
           </p>
         </div>
 
@@ -4606,7 +4606,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
             <div>
               <DeFybLogo size={24} />
               <p style={{ fontSize: "13px", color: DS.colors.textMuted, marginTop: "12px", maxWidth: "280px" }}>
-                Defying the death of private practice through intelligent automation.
+                Revenue capture, coding intelligence, and workflow automation for private practices.
               </p>
             </div>
             <div style={{ display: "flex", gap: "48px", flexWrap: "wrap" }}>

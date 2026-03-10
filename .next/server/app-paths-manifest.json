@@ -1,0 +1,10 @@
+{
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/auth/logout/route": "app/api/auth/logout/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/encounter/page": "app/encounter/page.js",
+  "/final-output/page": "app/final-output/page.js",
+  "/billing-review/page": "app/billing-review/page.js",
+  "/login/page": "app/login/page.js",
+  "/page": "app/page.js"
+}

@@ -1,7 +1,0 @@
-<svg width="220" height="48" viewBox="0 0 220 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="1" y="1" width="46" height="46" rx="12" fill="#0F3D2E"/>
-  <path d="M13 15H31.5V20H19V24.5H29V29H19V33H31.5V38H13V15Z" fill="#EAF6EF"/>
-  <path d="M38 10C38 7.79086 39.7909 6 42 6H44V42H42C39.7909 42 38 40.2091 38 38V10Z" fill="#3FA46A"/>
-  <text x="58" y="24" fill="#10231A" font-family="IBM Plex Sans, Avenir Next, Segoe UI, sans-serif" font-size="20" font-weight="700">DeFyb</text>
-  <text x="58" y="39" fill="#335848" font-family="IBM Plex Sans, Avenir Next, Segoe UI, sans-serif" font-size="11" font-weight="500">Defying the Death of Private Practice</text>
-</svg>

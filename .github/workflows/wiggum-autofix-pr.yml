@@ -1,0 +1,61 @@
+name: Wiggum Autofix PR
+
+on:
+  schedule:
+    - cron: "45 13 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  low-risk-autofix:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Generate report
+        run: node scripts/autopilot-report.mjs autopilot-report.md
+
+      - name: Apply low-risk autofixes
+        run: node scripts/autopilot-autofix.mjs autopilot-report.md
+
+      - name: Create draft pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: autopilot/low-risk-fixes
+          delete-branch: true
+          commit-message: "Autopilot low-risk UX improvements"
+          title: "Autopilot: Low-risk UX improvements"
+          body: |
+            Automated low-risk improvement pass focused on reducing doctor workflow friction.
+
+            Includes:
+            - latest autopilot report
+            - deterministic safe autofixes (when available)
+            - refreshed backlog with applied/skipped items
+
+            Please review before merge.
+          labels: |
+            autopilot
+            doctor-ux
+          draft: true
+          add-paths: |
+            src/App.jsx
+            AUTOPILOT_BACKLOG.md
+            autopilot-report.md

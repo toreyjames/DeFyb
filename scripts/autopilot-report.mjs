@@ -28,8 +28,9 @@ const landingCTA = app.includes("Login to Start the Tool");
 safeCheck("Landing CTA points to tool", landingCTA, landingCTA ? "Found tool CTA text" : "CTA text not found");
 
 const recommendations = [];
+const appLower = app.toLowerCase();
 
-if (!app.includes("Copy billing summary") && !app.includes("Copy note")) {
+if (!appLower.includes("copy billing summary") || !appLower.includes("copy note additions")) {
   recommendations.push({
     priority: "P1",
     item: "Add one-click copy actions in the Revenue Capture Tool",
@@ -38,7 +39,7 @@ if (!app.includes("Copy billing summary") && !app.includes("Copy note")) {
   });
 }
 
-if (!/recent analyses|analysis history|last 20/i.test(app)) {
+if (!/recent analyses|analysis history|last 20/i.test(appLower)) {
   recommendations.push({
     priority: "P1",
     item: "Add recent encounter analysis history",
@@ -47,7 +48,7 @@ if (!/recent analyses|analysis history|last 20/i.test(app)) {
   });
 }
 
-if (!/manual review required/i.test(app)) {
+if (!/manual review required/i.test(appLower)) {
   recommendations.push({
     priority: "P1",
     item: "Add low-confidence guardrail",

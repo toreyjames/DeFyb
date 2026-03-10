@@ -36,6 +36,13 @@ landing -> login -> revenue capture tool -> measurable billing lift.
 - Added clearer handling for rate limits, invalid email format, and provider failures.
 - Prevented repeated OAuth click spam while loading.
 
+### Pass 3
+- Added copy buttons for billing summary and suggested note additions.
+- Added recent analyses panel (last 20) in the revenue tool.
+- Added low-confidence guardrail message for manual review.
+- Added explicit route intent support for `/team` and `/tool`.
+- Added draft PR automation workflow for future low-risk autofixes.
+
 ## Next Recommended Pass
 1. Add copy buttons for:
 - billing rationale

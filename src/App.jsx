@@ -6601,6 +6601,52 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [note, setNote] = useState("");
   const [billedCode, setBilledCode] = useState("99213");
   const [analysis, setAnalysis] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [copied, setCopied] = useState("");
+
+  const copyText = async (label, text) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(label);
+      setTimeout(() => setCopied(""), 1400);
+    } catch {
+      setCopied("Copy failed");
+      setTimeout(() => setCopied(""), 1400);
+    }
+  };
+
+  const runAnalysis = () => {
+    const result = analyzeEncounterNote(note, billedCode);
+    setAnalysis(result);
+    setHistory((prev) => [{
+      id: `${Date.now()}`,
+      at: new Date().toLocaleString(),
+      billedCode,
+      suggestedCode: result.suggestedCode,
+      confidence: result.confidence,
+      estimatedDeltaPerVisit: result.estimatedDeltaPerVisit,
+      noteSnippet: (note || "").slice(0, 140),
+    }, ...prev].slice(0, 20));
+  };
+
+  const lowConfidence = analysis && analysis.confidence < 0.7;
+  const billingSummary = analysis ? [
+    `Billed code: ${billedCode}`,
+    `Suggested code: ${analysis.suggestedCode}`,
+    `Confidence: ${Math.round(analysis.confidence * 100)}%`,
+    "",
+    "Justification:",
+    ...analysis.rationale.map((r) => `- ${r}`),
+    "",
+    "Documentation gaps:",
+    ...(analysis.gaps.length > 0 ? analysis.gaps : ["- No major gaps detected."]).map((g) => `- ${g}`),
+    "",
+    `Estimated $/visit delta: $${analysis.estimatedDeltaPerVisit}`,
+    `Estimated monthly recovery: $${analysis.estimatedMonthlyRecovery.toLocaleString()}`,
+  ].join("\n") : "";
+
+  const noteAdditions = analysis ? analysis.suggestions.join("\n") : "";
 
   return (
     <div style={{ minHeight: "100vh" }}>
@@ -6653,9 +6699,12 @@ const RevenueCaptureTool = ({ onBack }) => {
                   <option value="99215">99215</option>
                 </select>
               </div>
-              <Button primary onClick={() => setAnalysis(analyzeEncounterNote(note, billedCode))}>
+              <Button primary onClick={runAnalysis}>
                 Analyze Encounter
               </Button>
+              {copied && (
+                <div style={{ fontSize: "12px", color: DS.colors.vital, marginLeft: "2px" }}>{copied}</div>
+              )}
             </div>
           </Card>
 
@@ -6676,7 +6725,19 @@ const RevenueCaptureTool = ({ onBack }) => {
         </div>
 
         {analysis && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginTop: "14px" }}>
+          <div style={{ marginTop: "14px", display: "grid", gap: "14px" }}>
+            {lowConfidence && (
+              <Card style={{ borderColor: DS.colors.warn, background: `${DS.colors.warn}11` }}>
+                <div style={{ fontWeight: 600, color: DS.colors.warn, marginBottom: "6px" }}>
+                  Manual review required
+                </div>
+                <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
+                  Confidence is below 70%. Keep physician/billing review in the loop before any coding change.
+                </div>
+              </Card>
+            )}
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
             <Card>
               <div style={{ fontWeight: 600, marginBottom: "10px" }}>Billing Justification</div>
               <div style={{ display: "grid", gap: "8px" }}>
@@ -6685,6 +6746,11 @@ const RevenueCaptureTool = ({ onBack }) => {
                     • {item}
                   </div>
                 ))}
+              </div>
+              <div style={{ marginTop: "12px" }}>
+                <Button small onClick={() => copyText("Copied billing summary", billingSummary)}>
+                  Copy Billing Summary
+                </Button>
               </div>
             </Card>
             <Card>
@@ -6710,6 +6776,43 @@ const RevenueCaptureTool = ({ onBack }) => {
                   </div>
                 ))}
               </div>
+              <div style={{ marginTop: "12px" }}>
+                <Button small onClick={() => copyText("Copied note additions", noteAdditions)}>
+                  Copy Note Additions
+                </Button>
+              </div>
+            </Card>
+            </div>
+
+            <Card>
+              <div style={{ fontWeight: 600, marginBottom: "10px" }}>Recent Analyses (last 20)</div>
+              {history.length === 0 ? (
+                <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>No analyses yet.</div>
+              ) : (
+                <div style={{ display: "grid", gap: "8px" }}>
+                  {history.map((h) => (
+                    <div key={h.id} style={{
+                      display: "grid",
+                      gridTemplateColumns: "140px 1fr auto",
+                      gap: "10px",
+                      alignItems: "center",
+                      padding: "8px 10px",
+                      borderRadius: DS.radius.sm,
+                      background: DS.colors.bg,
+                      border: `1px solid ${DS.colors.border}`,
+                    }}>
+                      <div style={{ fontSize: "11px", color: DS.colors.textDim }}>{h.at}</div>
+                      <div style={{ fontSize: "12px", color: DS.colors.textMuted }}>
+                        {h.billedCode} {"->"} {h.suggestedCode} ({Math.round(h.confidence * 100)}%) ·
+                        {h.noteSnippet ? ` ${h.noteSnippet}` : " No note snippet"}
+                      </div>
+                      <div style={{ fontSize: "12px", color: DS.colors.vital, fontWeight: 500 }}>
+                        +${h.estimatedDeltaPerVisit}/visit
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
           </div>
         )}
@@ -7047,10 +7150,24 @@ export default function App() {
     return isAllowedWorkEmail(user.email || "");
   };
 
+  const getRouteIntent = () => {
+    if (typeof window === "undefined") return null;
+    const path = (window.location.pathname || "").toLowerCase();
+    if (path === "/team") return "team";
+    if (path === "/tool" || path === "/app") return "tool";
+    if (window.location.search.includes("team")) return "team";
+    if (window.location.search.includes("tool")) return "tool";
+    return null;
+  };
+
   // Check for existing session on mount
   useEffect(() => {
     const checkSession = async () => {
+      const intent = getRouteIntent();
+
       if (!isSupabaseConfigured()) {
+        if (intent === "team") setCurrentView("team-login");
+        if (intent === "tool") setCurrentView("practice-login");
         setCheckingAuth(false);
         return;
       }
@@ -7060,15 +7177,19 @@ export default function App() {
         if (session?.user) {
           if (isTeamUser(session.user)) {
             setTeamUser(session.user);
-            if (typeof window !== "undefined" && window.location.search.includes("team")) {
+            if (intent === "team") {
               setCurrentView("team");
             }
           } else {
             setPracticeUser(session.user);
-            if (typeof window !== "undefined" && window.location.search.includes("tool")) {
+            if (intent === "tool") {
               setCurrentView("tool");
             }
           }
+        } else if (intent === "team") {
+          setCurrentView("team-login");
+        } else if (intent === "tool") {
+          setCurrentView("practice-login");
         }
       } catch (err) {
         console.error('Session check error:', err);

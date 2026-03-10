@@ -3838,6 +3838,14 @@ const StageActions = ({ practice, onAction }) => {
 const PublicSite = ({ onLogin, onClientLogin }) => {
   const intakeRef = useRef(null);
   const [submitted, setSubmitted] = useState(false);
+  const [baselineRan, setBaselineRan] = useState(false);
+  const [showAssessmentForm, setShowAssessmentForm] = useState(false);
+  const [baseline, setBaseline] = useState({
+    providers: "5",
+    visitsPerProviderPerDay: "20",
+    undercodedRate: "30",
+    avgMissedPerVisit: "58",
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [form, setForm] = useState({});
@@ -3859,6 +3867,19 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
       onLogin();
     }
   };
+
+  const baselineNumbers = (() => {
+    const providerCount = Math.max(1, parseInt(baseline.providers || "0", 10) || 0);
+    const visitsPerDay = Math.max(1, parseInt(baseline.visitsPerProviderPerDay || "0", 10) || 0);
+    const undercodedRate = Math.max(0, parseFloat(baseline.undercodedRate || "0") || 0) / 100;
+    const avgMissed = Math.max(0, parseFloat(baseline.avgMissedPerVisit || "0") || 0);
+    const annualVisits = providerCount * visitsPerDay * 240;
+    const undercodedVisits = Math.round(annualVisits * undercodedRate);
+    const annualRecovery = Math.round(undercodedVisits * avgMissed);
+    const monthlyRecovery = Math.round(annualRecovery / 12);
+
+    return { providerCount, visitsPerDay, undercodedVisits, annualRecovery, monthlyRecovery };
+  })();
 
   const handleSubmit = async () => {
     setError(null);
@@ -3966,7 +3987,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
             </span>
           ))}
           <span onClick={onClientLogin} style={{ fontSize: "13px", color: DS.colors.textMuted, cursor: "pointer", padding: "6px 10px" }}>Portal</span>
-          <Button primary small onClick={scrollToIntake}>Start</Button>
+          <Button primary small onClick={scrollToIntake}>Run Baseline</Button>
         </div>
       </nav>
 
@@ -3998,7 +4019,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
           </div>
 
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            <Button primary onClick={scrollToIntake}>Revenue Capture Assessment →</Button>
+            <Button primary onClick={scrollToIntake}>Start Free Coding Baseline →</Button>
             <Button onClick={() => document.getElementById("roi")?.scrollIntoView({ behavior: "smooth" })}>See the ROI</Button>
           </div>
         </section>
@@ -4345,26 +4366,83 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
           </div>
         </section>
 
-        {/* INTAKE FORM */}
+        {/* BASELINE + ASSESSMENT */}
         <section ref={intakeRef} style={{ padding: "80px 0" }}>
-          {submitted ? (
-            <div style={{ textAlign: "center", padding: "60px 0" }}>
-              <div style={{ fontSize: "48px", marginBottom: "16px" }}>⚡</div>
-              <h2 style={{ fontFamily: DS.fonts.display, fontSize: "32px", color: DS.colors.vital, marginBottom: "8px" }}>
-                Rhythm detected.
-              </h2>
-              <p style={{ color: DS.colors.textMuted, maxWidth: "400px", margin: "0 auto" }}>
-                We're reviewing your intake now. Expect a response within 48 hours with a preliminary assessment
-                and next steps. Once we begin, you'll get access to your own DeFyb client portal.
-              </p>
-            </div>
-          ) : (
-            <>
-              <SectionTitle sub="5 minutes. We'll tell you exactly what's broken and what it's costing you.">
-                Start your practice assessment
-              </SectionTitle>
+          <SectionTitle sub="Run a fast estimate first. Book a full assessment only if the coding opportunity is worth it.">
+            Start your free coding baseline
+          </SectionTitle>
 
-              <Card style={{ maxWidth: "700px" }}>
+          <Card style={{ maxWidth: "900px", marginBottom: "24px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginBottom: "16px" }}>
+              {[
+                { label: "Providers", key: "providers" },
+                { label: "Visits/provider/day", key: "visitsPerProviderPerDay" },
+                { label: "Estimated undercoded %", key: "undercodedRate" },
+                { label: "Avg missed $/visit", key: "avgMissedPerVisit" },
+              ].map((field) => (
+                <div key={field.key}>
+                  <label style={{ display: "block", fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    {field.label}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={baseline[field.key]}
+                    onChange={(e) => setBaseline({ ...baseline, [field.key]: e.target.value })}
+                    style={{
+                      width: "100%", padding: "10px 12px", background: DS.colors.bg,
+                      border: `1px solid ${DS.colors.borderLight}`, borderRadius: DS.radius.sm,
+                      color: DS.colors.text, fontSize: "14px", outline: "none",
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "16px" }}>
+              <Button primary onClick={() => setBaselineRan(true)}>Run Baseline Estimate</Button>
+              <Button onClick={() => setShowAssessmentForm((v) => !v)}>
+                {showAssessmentForm ? "Hide Assessment Form" : "Book Full Assessment"}
+              </Button>
+              <Button onClick={onClientLogin}>Watch Demo</Button>
+            </div>
+
+            {baselineRan && (
+              <div style={{
+                padding: "16px 18px", borderRadius: DS.radius.md, background: DS.colors.bg,
+                border: `1px solid ${DS.colors.borderLight}`, display: "grid", gap: "8px",
+              }}>
+                <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>Baseline Result</div>
+                <div style={{ fontFamily: DS.fonts.display, fontSize: "34px", color: DS.colors.vital }}>
+                  ${baselineNumbers.monthlyRecovery.toLocaleString()}/mo
+                </div>
+                <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
+                  Estimated recoverable revenue from {baselineNumbers.undercodedVisits.toLocaleString()} potentially undercoded encounters/year.
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {showAssessmentForm && (
+            <>
+              {submitted ? (
+                <div style={{ textAlign: "center", padding: "40px 0 60px" }}>
+                  <div style={{ fontSize: "48px", marginBottom: "16px" }}>⚡</div>
+                  <h2 style={{ fontFamily: DS.fonts.display, fontSize: "32px", color: DS.colors.vital, marginBottom: "8px" }}>
+                    Assessment request received.
+                  </h2>
+                  <p style={{ color: DS.colors.textMuted, maxWidth: "520px", margin: "0 auto" }}>
+                    We’ll follow up within 48 hours with a coding-focused review plan and next steps.
+                  </p>
+                </div>
+              ) : (
+                <Card style={{ maxWidth: "700px" }}>
+                  <div style={{ marginBottom: "18px" }}>
+                    <div style={{ fontWeight: 600, fontSize: "16px" }}>Book Full Assessment</div>
+                    <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
+                      Use this after baseline if you want a full workflow and implementation plan.
+                    </div>
+                  </div>
                 {[
                   // Practice Info (feeds baseline)
                   { label: "Practice Name", key: "name", type: "text", required: true },
@@ -4508,9 +4586,10 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
                   onClick={handleSubmit}
                   style={{ width: "100%", opacity: submitting ? 0.7 : 1 }}
                 >
-                  {submitting ? "Submitting..." : "⚡ Submit Assessment Request"}
+                  {submitting ? "Submitting..." : "⚡ Submit Full Assessment Request"}
                 </Button>
-              </Card>
+                </Card>
+              )}
             </>
           )}
         </section>
@@ -4531,7 +4610,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
               torey@defyb.org
             </a>
           </div>
-          <Button primary onClick={scrollToIntake}>Start Assessment →</Button>
+          <Button primary onClick={scrollToIntake}>Run Baseline →</Button>
         </section>
 
         {/* TRUST & COMPLIANCE */}

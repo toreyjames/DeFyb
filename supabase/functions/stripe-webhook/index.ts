@@ -91,6 +91,39 @@ serve(async (req) => {
     console.log(`Processing Stripe event: ${event.type}`);
 
     switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object;
+        const customerId = session.customer;
+        const subscriptionId = session.subscription || null;
+        const customerEmail = session.customer_details?.email || null;
+
+        if (customerId && customerEmail) {
+          const userId = session.metadata?.user_id;
+          if (userId) {
+            await supabase
+              .from("billing_profiles")
+              .upsert({
+                user_id: userId,
+                email: customerEmail,
+                stripe_customer_id: customerId,
+                stripe_subscription_id: subscriptionId,
+                billing_status: "active",
+                updated_at: new Date().toISOString(),
+              }, { onConflict: "user_id" });
+          }
+
+          await supabase
+            .from("practices")
+            .update({
+              stripe_customer_id: customerId,
+              stripe_subscription_id: subscriptionId,
+              payment_status: "current",
+            })
+            .eq("contact_email", customerEmail);
+        }
+        break;
+      }
+
       case "payment_intent.succeeded": {
         const paymentIntent = event.data.object;
 
@@ -197,12 +230,18 @@ serve(async (req) => {
             .from("practices")
             .update({ payment_status: "overdue" })
             .eq("stripe_customer_id", invoice.customer);
+
+          await supabase
+            .from("billing_profiles")
+            .update({ billing_status: "past_due", updated_at: new Date().toISOString() })
+            .eq("stripe_customer_id", invoice.customer);
         }
         break;
       }
 
       case "customer.subscription.updated": {
         const subscription = event.data.object;
+        const subStatus = subscription.status || "active";
 
         // Update practice with subscription info
         await supabase
@@ -211,6 +250,17 @@ serve(async (req) => {
             stripe_subscription_id: subscription.id,
             next_billing_date: new Date(subscription.current_period_end * 1000).toISOString().split("T")[0],
             monthly_rate: subscription.items.data[0]?.price?.unit_amount / 100,
+            payment_status: subStatus === "past_due" ? "overdue" : "current",
+          })
+          .eq("stripe_customer_id", subscription.customer);
+
+        await supabase
+          .from("billing_profiles")
+          .update({
+            stripe_subscription_id: subscription.id,
+            billing_status: subStatus,
+            monthly_amount: (subscription.items.data[0]?.price?.unit_amount || 29900) / 100,
+            updated_at: new Date().toISOString(),
           })
           .eq("stripe_customer_id", subscription.customer);
         break;
@@ -225,6 +275,15 @@ serve(async (req) => {
           .update({
             stripe_subscription_id: null,
             payment_status: "none",
+          })
+          .eq("stripe_customer_id", subscription.customer);
+
+        await supabase
+          .from("billing_profiles")
+          .update({
+            stripe_subscription_id: null,
+            billing_status: "canceled",
+            updated_at: new Date().toISOString(),
           })
           .eq("stripe_customer_id", subscription.customer);
         break;

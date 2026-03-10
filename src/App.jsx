@@ -6649,6 +6649,9 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [copied, setCopied] = useState("");
   const [error, setError] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [billingProfile, setBillingProfile] = useState(null);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [includeImplementation, setIncludeImplementation] = useState(false);
 
   const copyText = async (label, text) => {
     if (!text) return;
@@ -6692,8 +6695,60 @@ const RevenueCaptureTool = ({ onBack }) => {
       setHistory(mapped);
     };
 
+    const loadBillingProfile = async () => {
+      if (!isSupabaseConfigured()) return;
+      const { data } = await supabase
+        .from("billing_profiles")
+        .select("billing_status, plan_code, implementation_enabled, monthly_amount, stripe_subscription_id")
+        .maybeSingle();
+      if (data) setBillingProfile(data);
+    };
+
     loadHistory();
+    loadBillingProfile();
   }, []);
+
+  const startSubscriptionCheckout = async () => {
+    if (!isSupabaseConfigured()) {
+      setError("Billing service is not configured.");
+      return;
+    }
+    setBillingLoading(true);
+    setError(null);
+    try {
+      const { data, error: checkoutError } = await supabase.functions.invoke("create-billing-checkout", {
+        body: {
+          origin: window.location.origin,
+          includeImplementation,
+        },
+      });
+      if (checkoutError) throw checkoutError;
+      if (!data?.url) throw new Error("Unable to create checkout session");
+      window.location.href = data.url;
+    } catch (err) {
+      setError(err.message || "Could not start checkout.");
+      setBillingLoading(false);
+    }
+  };
+
+  const openBillingPortal = async () => {
+    if (!isSupabaseConfigured()) return;
+    setBillingLoading(true);
+    setError(null);
+    try {
+      const { data, error: portalError } = await supabase.functions.invoke("create-billing-portal", {
+        body: {
+          returnUrl: `${window.location.origin}/tool`,
+        },
+      });
+      if (portalError) throw portalError;
+      if (!data?.url) throw new Error("Unable to create billing portal session");
+      window.location.href = data.url;
+    } catch (err) {
+      setError(err.message || "Could not open billing portal.");
+      setBillingLoading(false);
+    }
+  };
 
   const runAnalysis = async () => {
     if (!note.trim()) {
@@ -6786,6 +6841,42 @@ const RevenueCaptureTool = ({ onBack }) => {
         <SectionTitle sub="Paste encounter documentation and get billing intelligence in seconds.">
           Revenue Capture Tool
         </SectionTitle>
+
+        <Card style={{ marginBottom: "14px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: "12px", flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: "4px" }}>Subscription</div>
+              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
+                Baseline Coding Plan: <strong style={{ color: DS.colors.text }}>$299/mo</strong>
+                {billingProfile?.stripe_subscription_id && (
+                  <span style={{ marginLeft: "8px", color: DS.colors.vital }}>
+                    • {billingProfile.billing_status || "active"}
+                  </span>
+                )}
+              </div>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", fontSize: "13px", color: DS.colors.textMuted }}>
+                <input
+                  type="checkbox"
+                  checked={includeImplementation}
+                  onChange={(e) => setIncludeImplementation(e.target.checked)}
+                  disabled={billingLoading || !!billingProfile?.stripe_subscription_id}
+                />
+                Add one-time implementation fee at checkout (optional)
+              </label>
+            </div>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {billingProfile?.stripe_subscription_id ? (
+                <Button primary onClick={() => !billingLoading && openBillingPortal()} style={{ opacity: billingLoading ? 0.7 : 1 }}>
+                  {billingLoading ? "Opening..." : "Manage Billing"}
+                </Button>
+              ) : (
+                <Button primary onClick={() => !billingLoading && startSubscriptionCheckout()} style={{ opacity: billingLoading ? 0.7 : 1 }}>
+                  {billingLoading ? "Starting..." : "Start $299 Subscription"}
+                </Button>
+              )}
+            </div>
+          </div>
+        </Card>
 
         <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "14px" }}>
           <Card>

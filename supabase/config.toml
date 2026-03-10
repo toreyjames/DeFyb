@@ -14,3 +14,13 @@ entrypoint = "./functions/notify-intake/index.ts"
 enabled = true
 verify_jwt = true
 entrypoint = "./functions/analyze-encounter/index.ts"
+
+[functions.create-billing-checkout]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/create-billing-checkout/index.ts"
+
+[functions.create-billing-portal]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/create-billing-portal/index.ts"

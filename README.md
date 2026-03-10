@@ -25,3 +25,14 @@ VITE_ALLOWED_TEAM_EMAILS=owner@clinicdomain.com,admin@clinicdomain.com
 - `tool`: encounter note -> billing code/gap/revenue analysis
 - `team-login`: internal team auth with allowlist controls
 - `team`: internal dashboard (defaults to Revenue Capture view)
+
+## Billing (Supabase Edge Functions)
+- `create-billing-checkout`: starts Stripe checkout for baseline subscription (`$299/mo`) with optional implementation fee.
+- `create-billing-portal`: opens Stripe customer portal for existing subscribers.
+- `stripe-webhook`: syncs subscription/payment status back to Supabase.
+
+Required Supabase secrets:
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_BASELINE_PRICE_ID` (recurring monthly baseline)
+- `STRIPE_IMPLEMENTATION_PRICE_ID` (optional one-time implementation fee)

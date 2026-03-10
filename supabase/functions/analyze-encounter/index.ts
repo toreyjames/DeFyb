@@ -126,8 +126,9 @@ serve(async (req) => {
       .insert({
         user_id: user.id,
         specialty,
-        note_text: note,
-        note_snippet: note.slice(0, 160),
+        // Do not persist raw note content/snippets; keep only billing intelligence outputs.
+        note_text: null,
+        note_snippet: null,
         billed_code: billedCode,
         suggested_code: result.suggestedCode,
         confidence: result.confidence,

@@ -6647,6 +6647,8 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [analysis, setAnalysis] = useState(null);
   const [history, setHistory] = useState([]);
   const [copied, setCopied] = useState("");
+  const [error, setError] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
 
   const copyText = async (label, text) => {
     if (!text) return;
@@ -6660,24 +6662,93 @@ const RevenueCaptureTool = ({ onBack }) => {
     }
   };
 
-  const runAnalysis = () => {
+  useEffect(() => {
+    const loadHistory = async () => {
+      if (!isSupabaseConfigured()) return;
+
+      const { data, error: historyError } = await supabase
+        .from("encounter_analyses")
+        .select("id, specialty, billed_code, suggested_code, confidence, estimated_delta_per_visit, note_snippet, created_at, rationale, gaps, suggestions, estimated_monthly_recovery")
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (historyError || !data) return;
+
+      const mapped = data.map((row) => ({
+        id: row.id,
+        at: new Date(row.created_at).toLocaleString(),
+        specialty: row.specialty || "General",
+        billedCode: row.billed_code,
+        suggestedCode: row.suggested_code,
+        confidence: Number(row.confidence),
+        estimatedDeltaPerVisit: Number(row.estimated_delta_per_visit || 0),
+        noteSnippet: row.note_snippet || "",
+        rationale: row.rationale || [],
+        gaps: row.gaps || [],
+        suggestions: row.suggestions || [],
+        estimatedMonthlyRecovery: Number(row.estimated_monthly_recovery || 0),
+      }));
+
+      setHistory(mapped);
+    };
+
+    loadHistory();
+  }, []);
+
+  const runAnalysis = async () => {
     if (!note.trim()) {
       setCopied("Paste an encounter note first");
       setTimeout(() => setCopied(""), 1400);
       return;
     }
-    const result = analyzeEncounterNote(note, billedCode);
-    setAnalysis(result);
-    setHistory((prev) => [{
-      id: `${Date.now()}`,
-      at: new Date().toLocaleString(),
-      specialty,
-      billedCode,
-      suggestedCode: result.suggestedCode,
-      confidence: result.confidence,
-      estimatedDeltaPerVisit: result.estimatedDeltaPerVisit,
-      noteSnippet: (note || "").slice(0, 140),
-    }, ...prev].slice(0, 20));
+    if (!isSupabaseConfigured()) {
+      setError("Coding analysis service is not configured.");
+      return;
+    }
+
+    setAnalyzing(true);
+    setError(null);
+
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke("analyze-encounter", {
+        body: { note, billedCode, specialty },
+      });
+
+      if (invokeError) throw invokeError;
+
+      const row = data?.analysis;
+      if (!row) throw new Error("No analysis response received");
+
+      const mapped = {
+        id: row.id,
+        at: new Date(row.created_at).toLocaleString(),
+        specialty: row.specialty || specialty,
+        billedCode: row.billed_code || billedCode,
+        suggestedCode: row.suggested_code,
+        confidence: Number(row.confidence),
+        estimatedDeltaPerVisit: Number(row.estimated_delta_per_visit || 0),
+        noteSnippet: row.note_snippet || note.slice(0, 160),
+        rationale: row.rationale || [],
+        gaps: row.gaps || [],
+        suggestions: row.suggestions || [],
+        estimatedMonthlyRecovery: Number(row.estimated_monthly_recovery || 0),
+      };
+
+      setAnalysis({
+        suggestedCode: mapped.suggestedCode,
+        rationale: mapped.rationale,
+        confidence: mapped.confidence,
+        gaps: mapped.gaps,
+        suggestions: mapped.suggestions,
+        estimatedDeltaPerVisit: mapped.estimatedDeltaPerVisit,
+        estimatedMonthlyRecovery: mapped.estimatedMonthlyRecovery,
+      });
+      setHistory((prev) => [mapped, ...prev.filter((p) => p.id !== mapped.id)].slice(0, 20));
+    } catch (err) {
+      setError(err.message || "Analysis failed. Please try again.");
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const lowConfidence = analysis && analysis.confidence < 0.7;
@@ -6781,13 +6852,21 @@ const RevenueCaptureTool = ({ onBack }) => {
                   <option>Pain Management</option>
                 </select>
               </div>
-              <Button primary onClick={runAnalysis}>
-                Analyze Encounter
+              <Button primary onClick={() => !analyzing && runAnalysis()} style={{ opacity: analyzing ? 0.7 : 1 }}>
+                {analyzing ? "Analyzing..." : "Analyze Encounter"}
               </Button>
               {copied && (
                 <div style={{ fontSize: "12px", color: DS.colors.vital, marginLeft: "2px" }}>{copied}</div>
               )}
             </div>
+            {error && (
+              <div style={{
+                marginTop: "10px", fontSize: "13px", color: DS.colors.danger,
+                background: DS.colors.dangerDim, borderRadius: DS.radius.sm, padding: "8px 10px",
+              }}>
+                {error}
+              </div>
+            )}
           </Card>
 
           <Card>

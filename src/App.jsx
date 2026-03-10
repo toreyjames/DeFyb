@@ -3886,9 +3886,9 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
 
       <div style={{
         flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "120px 24px 40px",
+        padding: "120px 24px 60px",
       }}>
-        <div style={{ width: "100%", maxWidth: "760px", textAlign: "center" }}>
+        <div style={{ width: "100%", maxWidth: "920px", textAlign: "center" }}>
           <h1 style={{
             fontFamily: DS.fonts.display, fontSize: "clamp(34px, 6vw, 64px)",
             lineHeight: 1.1, marginBottom: "18px",
@@ -3900,6 +3900,49 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
           </p>
           <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
             <Button primary onClick={onClientLogin}>Login to Start the Tool →</Button>
+          </div>
+
+          <div style={{
+            marginTop: "34px",
+            display: "grid",
+            gap: "12px",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          }}>
+            <Card style={{ textAlign: "left", padding: "16px" }}>
+              <div style={{ fontSize: "11px", color: DS.colors.textDim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                Baseline Plan
+              </div>
+              <div style={{ fontFamily: DS.fonts.display, fontSize: "30px", lineHeight: 1.1, margin: "6px 0" }}>
+                $299<span style={{ fontSize: "16px", color: DS.colors.textMuted }}>/mo</span>
+              </div>
+              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
+                Coding capture core: encounter analysis, code suggestion, documentation gap closure.
+              </div>
+            </Card>
+
+            <Card style={{ textAlign: "left", padding: "16px" }}>
+              <div style={{ fontSize: "11px", color: DS.colors.textDim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                Typical ROI Range
+              </div>
+              <div style={{ fontFamily: DS.fonts.display, fontSize: "30px", lineHeight: 1.1, margin: "6px 0", color: DS.colors.vital }}>
+                10x-30x
+              </div>
+              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
+                Based on underbilling recovery signal in early reviews and faster billing clarification.
+              </div>
+            </Card>
+
+            <Card style={{ textAlign: "left", padding: "16px" }}>
+              <div style={{ fontSize: "11px", color: DS.colors.textDim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                Optional Add-Ons
+              </div>
+              <div style={{ fontFamily: DS.fonts.display, fontSize: "24px", lineHeight: 1.1, margin: "8px 0 10px" }}>
+                DME, Prior Auth, Claims
+              </div>
+              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
+                Layer only after baseline coding lift is proven in your workflow.
+              </div>
+            </Card>
           </div>
         </div>
       </div>
@@ -6600,6 +6643,7 @@ const PracticeLogin = ({ onLogin, onBack }) => {
 const RevenueCaptureTool = ({ onBack }) => {
   const [note, setNote] = useState("");
   const [billedCode, setBilledCode] = useState("99213");
+  const [specialty, setSpecialty] = useState("General");
   const [analysis, setAnalysis] = useState(null);
   const [history, setHistory] = useState([]);
   const [copied, setCopied] = useState("");
@@ -6617,11 +6661,17 @@ const RevenueCaptureTool = ({ onBack }) => {
   };
 
   const runAnalysis = () => {
+    if (!note.trim()) {
+      setCopied("Paste an encounter note first");
+      setTimeout(() => setCopied(""), 1400);
+      return;
+    }
     const result = analyzeEncounterNote(note, billedCode);
     setAnalysis(result);
     setHistory((prev) => [{
       id: `${Date.now()}`,
       at: new Date().toLocaleString(),
+      specialty,
       billedCode,
       suggestedCode: result.suggestedCode,
       confidence: result.confidence,
@@ -6682,6 +6732,20 @@ const RevenueCaptureTool = ({ onBack }) => {
                 outline: "none",
               }}
             />
+            <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
+              <Button
+                small
+                onClick={() => setNote("Patient with chronic knee pain. MRI reviewed today. Discussed conservative treatment versus surgical intervention with risk/benefit counseling. Follow-up in 4 weeks.")}
+              >
+                Load Ortho Example
+              </Button>
+              <Button
+                small
+                onClick={() => setNote("Follow-up for hypertension and diabetes. Reviewed recent labs and medication response. Adjusted treatment plan and documented return precautions with next visit in 3 months.")}
+              >
+                Load Primary Care Example
+              </Button>
+            </div>
             <div style={{ display: "flex", alignItems: "end", gap: "10px", marginTop: "12px", flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px" }}>Currently billed code</div>
@@ -6697,6 +6761,24 @@ const RevenueCaptureTool = ({ onBack }) => {
                   <option value="99213">99213</option>
                   <option value="99214">99214</option>
                   <option value="99215">99215</option>
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px" }}>Specialty</div>
+                <select
+                  value={specialty}
+                  onChange={(e) => setSpecialty(e.target.value)}
+                  style={{
+                    padding: "10px 12px", borderRadius: DS.radius.sm,
+                    border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bg,
+                    color: DS.colors.text, fontSize: "14px",
+                  }}
+                >
+                  <option>General</option>
+                  <option>Orthopedics</option>
+                  <option>Family Medicine</option>
+                  <option>Internal Medicine</option>
+                  <option>Pain Management</option>
                 </select>
               </div>
               <Button primary onClick={runAnalysis}>
@@ -6740,6 +6822,23 @@ const RevenueCaptureTool = ({ onBack }) => {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
             <Card>
               <div style={{ fontWeight: 600, marginBottom: "10px" }}>Billing Justification</div>
+              <div style={{
+                display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px",
+                marginBottom: "10px", fontSize: "12px",
+              }}>
+                <div style={{ padding: "8px", borderRadius: DS.radius.sm, background: DS.colors.bg, border: `1px solid ${DS.colors.border}` }}>
+                  <div style={{ color: DS.colors.textDim }}>Billed</div>
+                  <div style={{ fontWeight: 600 }}>{billedCode}</div>
+                </div>
+                <div style={{ padding: "8px", borderRadius: DS.radius.sm, background: DS.colors.bg, border: `1px solid ${DS.colors.border}` }}>
+                  <div style={{ color: DS.colors.textDim }}>Suggested</div>
+                  <div style={{ fontWeight: 600, color: DS.colors.shock }}>{analysis.suggestedCode}</div>
+                </div>
+                <div style={{ padding: "8px", borderRadius: DS.radius.sm, background: DS.colors.bg, border: `1px solid ${DS.colors.border}` }}>
+                  <div style={{ color: DS.colors.textDim }}>Delta / Visit</div>
+                  <div style={{ fontWeight: 600, color: DS.colors.vital }}>${analysis.estimatedDeltaPerVisit}</div>
+                </div>
+              </div>
               <div style={{ display: "grid", gap: "8px" }}>
                 {analysis.rationale.map((item, i) => (
                   <div key={i} style={{ fontSize: "14px", color: DS.colors.textMuted }}>
@@ -6803,6 +6902,7 @@ const RevenueCaptureTool = ({ onBack }) => {
                     }}>
                       <div style={{ fontSize: "11px", color: DS.colors.textDim }}>{h.at}</div>
                       <div style={{ fontSize: "12px", color: DS.colors.textMuted }}>
+                        [{h.specialty}]{" "}
                         {h.billedCode} {"->"} {h.suggestedCode} ({Math.round(h.confidence * 100)}%) ·
                         {h.noteSnippet ? ` ${h.noteSnippet}` : " No note snippet"}
                       </div>

@@ -5342,7 +5342,7 @@ const ClientPortal = ({ onBack, practiceId: propPracticeId }) => {
 // TEAM DASHBOARD
 // ============================================================
 const TeamDashboard = ({ onBack }) => {
-  const [view, setView] = useState("pipeline");
+  const [view, setView] = useState("finances");
   const [selectedClient, setSelectedClient] = useState(null);
   const [practices, setPractices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -5535,9 +5535,15 @@ const TeamDashboard = ({ onBack }) => {
     { key: "pipeline", label: "Pipeline" },
     { key: "pilots", label: "Pilots" },
     { key: "activity", label: "Activity" },
-    { key: "finances", label: "Finances" },
+    { key: "finances", label: "Revenue Capture" },
     { key: "tasks", label: "Tasks" },
   ];
+
+  const totalCodingLift = practices.reduce((sum, p) => sum + (p.coding_uplift_monthly || 0), 0);
+  const totalRecoveredRevenue = practices.reduce((sum, p) => sum + (p.revenue_recovered_monthly || 0), 0);
+  const practicesWithCaptureSignals = practices.filter((p) =>
+    (p.denial_rate_baseline || 0) > 0 || (p.em_coding_distribution || "").length > 0
+  ).length;
 
   return (
     <div style={{ minHeight: "100vh" }}>
@@ -5563,10 +5569,10 @@ const TeamDashboard = ({ onBack }) => {
 
         {/* TOP STATS */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "10px", marginBottom: "24px" }}>
-          <MetricCard small label="Active Practices" value={practices.filter(p => p.stage === 'managed').length.toString()} color={DS.colors.vital} />
-          <MetricCard small label="In Pipeline" value={practices.filter(p => ['lead', 'assessment', 'implementation'].includes(p.stage)).length.toString()} color={DS.colors.warn} />
-          <MetricCard small label="Total Practices" value={practices.length.toString()} color={DS.colors.shock} />
-          <MetricCard small label="Leads" value={practices.filter(p => p.stage === 'lead').length.toString()} color={DS.colors.blue} />
+          <MetricCard small label="Monthly Coding Lift" value={`$${(totalCodingLift / 1000).toFixed(0)}K`} color={DS.colors.vital} />
+          <MetricCard small label="Monthly Recovered Rev" value={`$${(totalRecoveredRevenue / 1000).toFixed(0)}K`} color={DS.colors.vital} />
+          <MetricCard small label="Capture-Signal Practices" value={practicesWithCaptureSignals.toString()} color={DS.colors.shock} />
+          <MetricCard small label="Total Practices" value={practices.length.toString()} color={DS.colors.blue} />
         </div>
 
         {/* VIEW TOGGLE */}
@@ -6296,48 +6302,383 @@ const TeamDashboard = ({ onBack }) => {
   );
 };
 
+const analyzeEncounterNote = (noteText, billedCode = "99213") => {
+  const normalized = (noteText || "").toLowerCase();
+  const hasDataReview = /(mri|x-?ray|ct|imaging|lab|reviewed records|independent historian)/.test(normalized);
+  const hasProblemComplexity = /(chronic|worsening|exacerbation|persistent pain|multiple conditions)/.test(normalized);
+  const hasManagementRisk = /(surgery|procedure|injection|prescription|medication management|opioid|high risk)/.test(normalized);
+  const hasRiskDiscussion = /(risk|benefit|shared decision|alternatives|informed consent)/.test(normalized);
+  const hasFollowUpPlan = /(follow-up|return in|plan|next steps|monitor)/.test(normalized);
+
+  const rationale = [];
+  if (hasDataReview) rationale.push("Reviewed external/internal diagnostic data (imaging/labs/history).");
+  if (hasProblemComplexity) rationale.push("Problem complexity indicates moderate decision burden.");
+  if (hasManagementRisk) rationale.push("Management options include higher-risk treatment decisions.");
+  if (hasRiskDiscussion) rationale.push("Risk/benefit discussion is documented for management choices.");
+  if (hasFollowUpPlan) rationale.push("Assessment includes a clear ongoing treatment/follow-up plan.");
+
+  let suggestedCode = "99213";
+  if (rationale.length >= 3) suggestedCode = "99214";
+  if (rationale.length >= 5 || (hasManagementRisk && hasDataReview && hasRiskDiscussion)) suggestedCode = "99215";
+
+  const codeRank = { "99213": 1, "99214": 2, "99215": 3 };
+  const perVisitDelta = {
+    "99213->99214": 58,
+    "99213->99215": 132,
+    "99214->99215": 74,
+  };
+
+  const gaps = [];
+  const suggestions = [];
+  if (!hasDataReview) {
+    gaps.push("Data review not clearly documented.");
+    suggestions.push("Reviewed relevant prior records and diagnostic data to inform clinical decision making.");
+  }
+  if (!hasRiskDiscussion) {
+    gaps.push("Risk/benefit discussion missing for selected management path.");
+    suggestions.push("Discussed risks and benefits of procedural and conservative treatment options with shared decision making.");
+  }
+  if (!hasFollowUpPlan) {
+    gaps.push("Follow-up plan or monitoring details are limited.");
+    suggestions.push("Documented follow-up timeline, return precautions, and criteria for escalation.");
+  }
+
+  const deltaKey = `${billedCode}->${suggestedCode}`;
+  const estimatedDeltaPerVisit = codeRank[suggestedCode] > codeRank[billedCode] ? (perVisitDelta[deltaKey] || 0) : 0;
+
+  return {
+    suggestedCode,
+    rationale,
+    confidence: Math.min(0.96, 0.52 + rationale.length * 0.1),
+    gaps,
+    suggestions,
+    estimatedDeltaPerVisit,
+    estimatedMonthlyRecovery: estimatedDeltaPerVisit * 80,
+  };
+};
+
 // ============================================================
-// CLIENT LOGIN (placeholder until portal is wired up)
+// PRACTICE LOGIN
 // ============================================================
-const ClientLogin = ({ onBack }) => {
+const PracticeLogin = ({ onLogin, onBack }) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [usePassword, setUsePassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [linkSent, setLinkSent] = useState(false);
+
+  const handlePasswordLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    if (!isSupabaseConfigured()) {
+      setError("Authentication not configured");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) throw authError;
+      if (data.user) onLogin(data.user);
+    } catch (err) {
+      setError(err.message || "Invalid credentials");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMagicLink = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    if (!isSupabaseConfigured()) {
+      setError("Authentication not configured");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { error: authError } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: window.location.origin + "?tool=1" },
+      });
+      if (authError) throw authError;
+      setLinkSent(true);
+    } catch (err) {
+      setError(err.message || "Failed to send magic link");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOAuth = async (provider) => {
+    setLoading(true);
+    setError(null);
+
+    if (!isSupabaseConfigured()) {
+      setError("Authentication not configured");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: window.location.origin + "?tool=1",
+          queryParams: provider === "azure" ? { prompt: "select_account" } : undefined,
+        },
+      });
+      if (authError) throw authError;
+    } catch (err) {
+      setError(err.message || "OAuth sign-in failed");
+      setLoading(false);
+    }
+  };
+
+  if (linkSent) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Card style={{ width: "100%", maxWidth: "380px", margin: "20px", textAlign: "center" }}>
+          <div style={{ fontSize: "48px", marginBottom: "16px" }}>📧</div>
+          <h2 style={{ fontFamily: DS.fonts.display, fontSize: "24px", marginBottom: "8px" }}>Check your email</h2>
+          <p style={{ color: DS.colors.textMuted, fontSize: "14px", marginBottom: "24px" }}>
+            Magic link sent to <strong style={{ color: DS.colors.text }}>{email}</strong>.
+          </p>
+          <span onClick={() => { setLinkSent(false); setEmail(""); }} style={{ fontSize: "13px", color: DS.colors.shock, cursor: "pointer" }}>
+            Use a different email
+          </span>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ width: "100%", maxWidth: "420px", margin: "20px", textAlign: "center" }}>
-        <div style={{ marginBottom: "24px" }}>
+      <Card style={{ width: "100%", maxWidth: "390px", margin: "20px" }}>
+        <div style={{ textAlign: "center", marginBottom: "24px" }}>
           <DeFybLogo size={32} />
+          <div style={{ fontFamily: DS.fonts.mono, fontSize: "11px", color: DS.colors.vital, marginTop: "8px", letterSpacing: "0.1em" }}>
+            PRACTICE ACCESS
+          </div>
         </div>
 
-        <h2 style={{ fontFamily: DS.fonts.display, fontSize: "24px", marginBottom: "12px" }}>
-          Client Portal
-        </h2>
-
-        <p style={{ color: DS.colors.textMuted, fontSize: "14px", marginBottom: "24px", lineHeight: 1.6 }}>
-          Your practice dashboard is being prepared. Once your assessment is complete,
-          you'll receive login credentials to access your live metrics, AI stack status,
-          and practice health score.
-        </p>
+        <div style={{ display: "grid", gap: "10px", marginBottom: "16px" }}>
+          <Button onClick={() => handleOAuth("google")} style={{ width: "100%" }}>Continue with Google</Button>
+          <Button onClick={() => handleOAuth("azure")} style={{ width: "100%" }}>Continue with Microsoft</Button>
+        </div>
 
         <div style={{
-          padding: "16px", background: DS.colors.bg, borderRadius: DS.radius.md,
-          marginBottom: "24px",
+          fontSize: "11px", color: DS.colors.textDim, marginBottom: "14px",
+          textAlign: "center", textTransform: "uppercase", letterSpacing: "0.08em"
         }}>
-          <div style={{ fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px" }}>
-            Questions?
-          </div>
-          <a href="mailto:torey@defyb.org" style={{
-            color: DS.colors.shock, textDecoration: "none", fontWeight: 500,
-          }}>
-            torey@defyb.org
-          </a>
+          or sign in with email
         </div>
 
-        <span
-          onClick={onBack}
-          style={{ fontSize: "13px", color: DS.colors.textMuted, cursor: "pointer" }}
-        >
-          ← Back to site
-        </span>
+        <form onSubmit={usePassword ? handlePasswordLogin : handleMagicLink}>
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ display: "block", fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              Clinic Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="doctor@clinic.com"
+              required
+              style={{
+                width: "100%", padding: "10px 12px", background: DS.colors.bg,
+                border: `1px solid ${DS.colors.borderLight}`, borderRadius: DS.radius.sm,
+                color: DS.colors.text, fontSize: "14px", outline: "none",
+              }}
+            />
+          </div>
+
+          {usePassword && (
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ display: "block", fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                required
+                style={{
+                  width: "100%", padding: "10px 12px", background: DS.colors.bg,
+                  border: `1px solid ${DS.colors.borderLight}`, borderRadius: DS.radius.sm,
+                  color: DS.colors.text, fontSize: "14px", outline: "none",
+                }}
+              />
+            </div>
+          )}
+
+          {error && (
+            <div style={{
+              padding: "10px 14px", marginBottom: "16px", borderRadius: DS.radius.sm,
+              background: DS.colors.dangerDim, color: DS.colors.danger, fontSize: "13px",
+            }}>
+              {error}
+            </div>
+          )}
+
+          <button type="submit" style={{
+            width: "100%", padding: "12px 28px",
+            background: DS.colors.shock, color: "#fff",
+            border: "none", borderRadius: DS.radius.md,
+            cursor: "pointer", fontFamily: DS.fonts.body,
+            fontSize: "15px", fontWeight: 500, letterSpacing: "0.01em",
+            opacity: loading ? 0.7 : 1, transition: "all 0.2s ease",
+          }}>
+            {loading ? (usePassword ? "Signing in..." : "Sending...") : (usePassword ? "Sign In" : "Send Magic Link")}
+          </button>
+        </form>
+
+        <p style={{ textAlign: "center", marginTop: "16px", fontSize: "12px", color: DS.colors.textDim }}>
+          {usePassword ? (
+            <span onClick={() => setUsePassword(false)} style={{ color: DS.colors.shock, cursor: "pointer" }}>Switch to magic link</span>
+          ) : (
+            <>
+              No password needed or <span onClick={() => setUsePassword(true)} style={{ color: DS.colors.shock, cursor: "pointer" }}>use password</span>
+            </>
+          )}
+        </p>
+
+        <div style={{ textAlign: "center", marginTop: "20px" }}>
+          <span onClick={onBack} style={{ fontSize: "13px", color: DS.colors.textMuted, cursor: "pointer" }}>
+            ← Back to site
+          </span>
+        </div>
       </Card>
+    </div>
+  );
+};
+
+// ============================================================
+// PRACTICE TOOL
+// ============================================================
+const RevenueCaptureTool = ({ onBack }) => {
+  const [note, setNote] = useState("");
+  const [billedCode, setBilledCode] = useState("99213");
+  const [analysis, setAnalysis] = useState(null);
+
+  return (
+    <div style={{ minHeight: "100vh" }}>
+      <nav style={{
+        position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "12px clamp(20px, 5vw, 80px)",
+        background: `${DS.colors.bg}ee`, backdropFilter: "blur(12px)",
+        borderBottom: `1px solid ${DS.colors.border}`,
+      }}>
+        <DeFybLogo size={24} />
+        <span onClick={onBack} style={{ fontSize: "13px", color: DS.colors.textMuted, cursor: "pointer" }}>Sign out</span>
+      </nav>
+
+      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "92px 20px 40px" }}>
+        <SectionTitle sub="Paste encounter documentation and get billing intelligence in seconds.">
+          Revenue Capture Tool
+        </SectionTitle>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "14px" }}>
+          <Card>
+            <div style={{ fontSize: "12px", color: DS.colors.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>
+              Encounter Note
+            </div>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Paste clinical note or transcript..."
+              style={{
+                width: "100%", minHeight: "280px", resize: "vertical",
+                padding: "12px", borderRadius: DS.radius.sm, fontSize: "14px",
+                color: DS.colors.text, background: DS.colors.bg, border: `1px solid ${DS.colors.borderLight}`,
+                outline: "none",
+              }}
+            />
+            <div style={{ display: "flex", alignItems: "end", gap: "10px", marginTop: "12px", flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px" }}>Currently billed code</div>
+                <select
+                  value={billedCode}
+                  onChange={(e) => setBilledCode(e.target.value)}
+                  style={{
+                    padding: "10px 12px", borderRadius: DS.radius.sm,
+                    border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bg,
+                    color: DS.colors.text, fontSize: "14px",
+                  }}
+                >
+                  <option value="99213">99213</option>
+                  <option value="99214">99214</option>
+                  <option value="99215">99215</option>
+                </select>
+              </div>
+              <Button primary onClick={() => setAnalysis(analyzeEncounterNote(note, billedCode))}>
+                Analyze Encounter
+              </Button>
+            </div>
+          </Card>
+
+          <Card>
+            {!analysis ? (
+              <div style={{ fontSize: "14px", color: DS.colors.textMuted }}>
+                No analysis yet. Run encounter analysis to generate a suggested code, rationale, documentation gaps, and recovery estimate.
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: "12px" }}>
+                <MetricCard label="Suggested Code" value={analysis.suggestedCode} color={DS.colors.shock} />
+                <MetricCard label="Confidence" value={`${Math.round(analysis.confidence * 100)}%`} color={DS.colors.blue} />
+                <MetricCard label="Estimated $ / Visit" value={`$${analysis.estimatedDeltaPerVisit}`} color={DS.colors.vital} />
+                <MetricCard label="Estimated Monthly Recovery" value={`$${analysis.estimatedMonthlyRecovery.toLocaleString()}`} color={DS.colors.vital} />
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {analysis && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginTop: "14px" }}>
+            <Card>
+              <div style={{ fontWeight: 600, marginBottom: "10px" }}>Billing Justification</div>
+              <div style={{ display: "grid", gap: "8px" }}>
+                {analysis.rationale.map((item, i) => (
+                  <div key={i} style={{ fontSize: "14px", color: DS.colors.textMuted }}>
+                    • {item}
+                  </div>
+                ))}
+              </div>
+            </Card>
+            <Card>
+              <div style={{ fontWeight: 600, marginBottom: "10px" }}>Documentation Gaps</div>
+              <div style={{ display: "grid", gap: "8px" }}>
+                {analysis.gaps.length > 0 ? analysis.gaps.map((item, i) => (
+                  <div key={i} style={{ fontSize: "14px", color: DS.colors.warn }}>
+                    • {item}
+                  </div>
+                )) : (
+                  <div style={{ fontSize: "14px", color: DS.colors.vital }}>No major gaps detected.</div>
+                )}
+              </div>
+              <div style={{ marginTop: "12px", fontWeight: 600, fontSize: "13px" }}>Suggested Note Additions</div>
+              <div style={{ marginTop: "6px", display: "grid", gap: "8px" }}>
+                {analysis.suggestions.map((item, i) => (
+                  <div key={i} style={{
+                    fontSize: "13px", color: DS.colors.text,
+                    background: DS.colors.bg, border: `1px solid ${DS.colors.border}`,
+                    borderRadius: DS.radius.sm, padding: "8px 10px",
+                  }}>
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -6642,6 +6983,7 @@ const TeamLogin = ({ onLogin, onBack }) => {
 export default function App() {
   const [currentView, setCurrentView] = useState("public");
   const [teamUser, setTeamUser] = useState(null);
+  const [practiceUser, setPracticeUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   const allowedDomains = (import.meta.env.VITE_ALLOWED_TEAM_DOMAINS || "defyb.org")
@@ -6683,12 +7025,14 @@ export default function App() {
         if (session?.user) {
           if (isTeamUser(session.user)) {
             setTeamUser(session.user);
-            // Check URL for team access intent
-            if (typeof window !== 'undefined' && window.location.search.includes('team')) {
-              setCurrentView('team');
+            if (typeof window !== "undefined" && window.location.search.includes("team")) {
+              setCurrentView("team");
             }
           } else {
-            await supabase.auth.signOut();
+            setPracticeUser(session.user);
+            if (typeof window !== "undefined" && window.location.search.includes("tool")) {
+              setCurrentView("tool");
+            }
           }
         }
       } catch (err) {
@@ -6705,11 +7049,14 @@ export default function App() {
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_OUT') {
           setTeamUser(null);
+          setPracticeUser(null);
           setCurrentView('public');
         } else if (session?.user && isTeamUser(session.user)) {
           setTeamUser(session.user);
+          setPracticeUser(null);
         } else if (session?.user) {
-          supabase.auth.signOut();
+          setPracticeUser(session.user);
+          setTeamUser(null);
         }
       });
 
@@ -6726,7 +7073,20 @@ export default function App() {
       return;
     }
     setTeamUser(user);
+    setPracticeUser(null);
     setCurrentView('team');
+  };
+
+  const handlePracticeLogin = (user) => {
+    if (isTeamUser(user)) {
+      setTeamUser(user);
+      setPracticeUser(null);
+      setCurrentView("team");
+      return;
+    }
+    setPracticeUser(user);
+    setTeamUser(null);
+    setCurrentView("tool");
   };
 
   const handleTeamLogout = async () => {
@@ -6734,15 +7094,25 @@ export default function App() {
       await supabase.auth.signOut();
     }
     setTeamUser(null);
+    setPracticeUser(null);
     setCurrentView('public');
   };
 
   const handleRequestTeamAccess = () => {
-    // If already logged in, go straight to dashboard
     if (teamUser) {
       setCurrentView('team');
     } else {
       setCurrentView('team-login');
+    }
+  };
+
+  const handleRequestPracticeAccess = () => {
+    if (practiceUser) {
+      setCurrentView("tool");
+    } else if (teamUser) {
+      setCurrentView("team");
+    } else {
+      setCurrentView("practice-login");
     }
   };
 
@@ -6771,11 +7141,14 @@ export default function App() {
       {currentView === "public" && (
         <PublicSite
           onLogin={handleRequestTeamAccess}
-          onClientLogin={handleRequestTeamAccess}
+          onClientLogin={handleRequestPracticeAccess}
         />
       )}
-      {currentView === "client" && (
-        <ClientLogin onBack={() => setCurrentView("public")} />
+      {currentView === "practice-login" && (
+        <PracticeLogin
+          onLogin={handlePracticeLogin}
+          onBack={() => setCurrentView("public")}
+        />
       )}
       {currentView === "team-login" && (
         <TeamLogin
@@ -6789,6 +7162,16 @@ export default function App() {
         ) : (
           <TeamLogin
             onLogin={handleTeamLogin}
+            onBack={() => setCurrentView("public")}
+          />
+        )
+      )}
+      {currentView === "tool" && (
+        practiceUser ? (
+          <RevenueCaptureTool onBack={handleTeamLogout} />
+        ) : (
+          <PracticeLogin
+            onLogin={handlePracticeLogin}
             onBack={() => setCurrentView("public")}
           />
         )

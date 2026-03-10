@@ -1,0 +1,144 @@
+:root {
+  --bg: #f4f7f4;
+  --panel: #ffffff;
+  --text: #122216;
+  --muted: #4c6654;
+  --brand: #14532d;
+  --brand-soft: #e4f4e6;
+  --border: #d7e3d7;
+  --alert: #7f1d1d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top left, #e8f7ea 0%, var(--bg) 40%);
+  color: var(--text);
+}
+
+main {
+  min-height: 100vh;
+  padding: 2rem 1rem 4rem;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.site-header {
+  margin: 0 0 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #c8dcc9;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ecf8ed, #f8fcf8);
+}
+
+.site-header h2 {
+  margin: 0.25rem 0 0.35rem;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #2f5f3c;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+}
+
+.panel,
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.25rem;
+  box-shadow: 0 12px 35px rgba(20, 83, 45, 0.08);
+}
+
+.card {
+  margin-top: 1rem;
+}
+
+.card.accent {
+  background: linear-gradient(135deg, #f0faf1, #e7f7ea);
+}
+
+h1,
+h2 {
+  margin: 0 0 0.5rem;
+}
+
+.subtitle {
+  color: var(--muted);
+  margin: 0 0 1rem;
+}
+
+label {
+  display: block;
+  font-weight: 600;
+  margin: 0.75rem 0 0.35rem;
+}
+
+textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.8rem;
+  font: inherit;
+  background: #fbfefb;
+}
+
+button {
+  margin-top: 1rem;
+  padding: 0.7rem 1rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--brand);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #2f4f39;
+}
+
+ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.suggestion {
+  color: var(--alert);
+}
+
+.toolbar {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.recovery {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.code-box {
+  background: #f6fbf6;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.9rem;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 700px) {
+  main {
+    padding: 1rem 0.75rem 2rem;
+  }
+}

@@ -1,13 +1,28 @@
-# DeFyb — Defying the Death of Private Practice
+# DeFyb
 
-Clinician-led AI implementation platform for small group medical practices.
+DeFyb is a healthcare revenue optimization MVP designed around:
 
-## Tech Stack
-- React 18 + Vite
-- Deploys to Vercel
+`AI Scribe -> Billing Intelligence -> Revenue Optimization`
 
-## Dev
+This version is a clean Next.js + TypeScript foundation with a rules-based coding engine and three-screen workflow.
+Post-MVP roadmap items such as DME workflows and prior authorization are intentionally deferred.
+
+## MVP Flow
+
+1. Encounter Input
+2. Billing Review
+3. Final Output
+
+## Run locally
+
 ```bash
 npm install
 npm run dev
+```
+
+## Build
+
+```bash
+npm run build
+npm run start
 ```

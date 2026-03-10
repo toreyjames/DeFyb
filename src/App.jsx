@@ -6683,7 +6683,7 @@ export default function App() {
       {currentView === "public" && (
         <PublicSite
           onLogin={handleRequestTeamAccess}
-          onClientLogin={() => setCurrentView("client")}
+          onClientLogin={handleRequestTeamAccess}
         />
       )}
       {currentView === "client" && (

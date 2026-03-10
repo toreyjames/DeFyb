@@ -96,6 +96,7 @@ serve(async (req) => {
         const customerId = session.customer;
         const subscriptionId = session.subscription || null;
         const customerEmail = session.customer_details?.email || null;
+        const providerCount = Math.max(1, Number(session.metadata?.provider_count || 1));
 
         if (customerId && customerEmail) {
           const userId = session.metadata?.user_id;
@@ -108,6 +109,8 @@ serve(async (req) => {
                 stripe_customer_id: customerId,
                 stripe_subscription_id: subscriptionId,
                 billing_status: "active",
+                licensed_provider_count: providerCount,
+                active_provider_count: providerCount,
                 updated_at: new Date().toISOString(),
               }, { onConflict: "user_id" });
           }
@@ -242,6 +245,14 @@ serve(async (req) => {
       case "customer.subscription.updated": {
         const subscription = event.data.object;
         const subStatus = subscription.status || "active";
+        const monthlyAmount = (subscription.items?.data || []).reduce(
+          (sum: number, item: any) => sum + ((item.price?.unit_amount || 0) * (item.quantity || 1)),
+          0,
+        ) / 100;
+        const licensedProviderCount = (subscription.items?.data || []).reduce(
+          (sum: number, item: any) => sum + (item.quantity || 0),
+          0,
+        );
 
         // Update practice with subscription info
         await supabase
@@ -249,7 +260,7 @@ serve(async (req) => {
           .update({
             stripe_subscription_id: subscription.id,
             next_billing_date: new Date(subscription.current_period_end * 1000).toISOString().split("T")[0],
-            monthly_rate: subscription.items.data[0]?.price?.unit_amount / 100,
+            monthly_rate: monthlyAmount,
             payment_status: subStatus === "past_due" ? "overdue" : "current",
           })
           .eq("stripe_customer_id", subscription.customer);
@@ -259,7 +270,8 @@ serve(async (req) => {
           .update({
             stripe_subscription_id: subscription.id,
             billing_status: subStatus,
-            monthly_amount: (subscription.items.data[0]?.price?.unit_amount || 29900) / 100,
+            monthly_amount: monthlyAmount || 299,
+            licensed_provider_count: Math.max(1, licensedProviderCount || 1),
             updated_at: new Date().toISOString(),
           })
           .eq("stripe_customer_id", subscription.customer);

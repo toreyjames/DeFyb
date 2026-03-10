@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS billing_profiles (
   billing_status TEXT DEFAULT 'none' CHECK (billing_status IN ('none', 'trialing', 'active', 'past_due', 'canceled', 'incomplete')),
   plan_code TEXT DEFAULT 'baseline_299',
   implementation_enabled BOOLEAN DEFAULT false,
+  licensed_provider_count INTEGER DEFAULT 1,
+  active_provider_count INTEGER DEFAULT 1,
   monthly_amount NUMERIC DEFAULT 299,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -35,4 +37,3 @@ CREATE POLICY "Users can update own billing profile"
   FOR UPDATE
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
-

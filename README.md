@@ -35,4 +35,5 @@ Required Supabase secrets:
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - `STRIPE_BASELINE_PRICE_ID` (recurring monthly baseline)
+- `STRIPE_ADDITIONAL_PROVIDER_PRICE_ID` (recurring monthly additional provider seat)
 - `STRIPE_IMPLEMENTATION_PRICE_ID` (optional one-time implementation fee)

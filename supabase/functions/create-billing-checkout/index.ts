@@ -10,6 +10,7 @@ type CheckoutRequest = {
   origin?: string;
   includeImplementation?: boolean;
   practiceId?: string;
+  providerCount?: number;
 };
 
 const stripeRequest = async (path: string, body?: URLSearchParams, method = "POST") => {
@@ -61,13 +62,19 @@ serve(async (req) => {
 
     const payload = (await req.json().catch(() => ({}))) as CheckoutRequest;
     const includeImplementation = !!payload.includeImplementation;
+    const providerCount = Math.max(1, Math.min(200, Number(payload.providerCount || 1)));
+    const additionalProviders = Math.max(0, providerCount - 1);
     const origin = payload.origin?.startsWith("http") ? payload.origin : "https://defyb.org";
 
     const baselinePriceId = Deno.env.get("STRIPE_BASELINE_PRICE_ID");
     const implementationPriceId = Deno.env.get("STRIPE_IMPLEMENTATION_PRICE_ID");
+    const additionalProviderPriceId = Deno.env.get("STRIPE_ADDITIONAL_PROVIDER_PRICE_ID");
     if (!baselinePriceId) throw new Error("STRIPE_BASELINE_PRICE_ID is not configured");
     if (includeImplementation && !implementationPriceId) {
       throw new Error("Implementation fee is not configured yet. Contact support.");
+    }
+    if (additionalProviders > 0 && !additionalProviderPriceId) {
+      throw new Error("Additional provider pricing is not configured yet. Contact support.");
     }
 
     const { data: existingProfile } = await userClient
@@ -93,9 +100,16 @@ serve(async (req) => {
     params.set("line_items[0][price]", baselinePriceId);
     params.set("line_items[0][quantity]", "1");
 
+    let lineIdx = 1;
+    if (additionalProviders > 0 && additionalProviderPriceId) {
+      params.set(`line_items[${lineIdx}][price]`, additionalProviderPriceId);
+      params.set(`line_items[${lineIdx}][quantity]`, String(additionalProviders));
+      lineIdx += 1;
+    }
+
     if (includeImplementation && implementationPriceId) {
-      params.set("line_items[1][price]", implementationPriceId);
-      params.set("line_items[1][quantity]", "1");
+      params.set(`line_items[${lineIdx}][price]`, implementationPriceId);
+      params.set(`line_items[${lineIdx}][quantity]`, "1");
     }
 
     params.set("success_url", `${origin}/tool?billing=success&session_id={CHECKOUT_SESSION_ID}`);
@@ -103,6 +117,7 @@ serve(async (req) => {
     params.set("allow_promotion_codes", "true");
     params.set("metadata[user_id]", user.id);
     params.set("metadata[include_implementation]", String(includeImplementation));
+    params.set("metadata[provider_count]", String(providerCount));
 
     const session = await stripeRequest("checkout/sessions", params);
 
@@ -113,6 +128,9 @@ serve(async (req) => {
         email: user.email || "",
         stripe_customer_id: stripeCustomerId,
         implementation_enabled: includeImplementation,
+        licensed_provider_count: providerCount,
+        active_provider_count: providerCount,
+        monthly_amount: 299 + (additionalProviders * 199),
         updated_at: new Date().toISOString(),
       });
 

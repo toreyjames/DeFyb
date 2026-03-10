@@ -6652,6 +6652,8 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [billingProfile, setBillingProfile] = useState(null);
   const [billingLoading, setBillingLoading] = useState(false);
   const [includeImplementation, setIncludeImplementation] = useState(false);
+  const [providerCount, setProviderCount] = useState(1);
+  const [activeProviders, setActiveProviders] = useState(1);
 
   const copyText = async (label, text) => {
     if (!text) return;
@@ -6699,9 +6701,13 @@ const RevenueCaptureTool = ({ onBack }) => {
       if (!isSupabaseConfigured()) return;
       const { data } = await supabase
         .from("billing_profiles")
-        .select("billing_status, plan_code, implementation_enabled, monthly_amount, stripe_subscription_id")
+        .select("billing_status, plan_code, implementation_enabled, monthly_amount, stripe_subscription_id, licensed_provider_count, active_provider_count")
         .maybeSingle();
-      if (data) setBillingProfile(data);
+      if (data) {
+        setBillingProfile(data);
+        setProviderCount(Math.max(1, Number(data.licensed_provider_count || 1)));
+        setActiveProviders(Math.max(1, Number(data.active_provider_count || data.licensed_provider_count || 1)));
+      }
     };
 
     loadHistory();
@@ -6720,6 +6726,7 @@ const RevenueCaptureTool = ({ onBack }) => {
         body: {
           origin: window.location.origin,
           includeImplementation,
+          providerCount,
         },
       });
       if (checkoutError) throw checkoutError;
@@ -6729,6 +6736,30 @@ const RevenueCaptureTool = ({ onBack }) => {
       setError(err.message || "Could not start checkout.");
       setBillingLoading(false);
     }
+  };
+
+  const saveSeatUsage = async () => {
+    if (!isSupabaseConfigured()) return;
+    const safeActive = Math.max(1, Number(activeProviders || 1));
+    const safeLicensed = Math.max(1, Number(providerCount || 1));
+
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+    if (!user) return;
+
+    await supabase.from("billing_profiles").upsert({
+      user_id: user.id,
+      email: user.email || "",
+      active_provider_count: safeActive,
+      licensed_provider_count: safeLicensed,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+
+    setBillingProfile((prev) => ({
+      ...(prev || {}),
+      active_provider_count: safeActive,
+      licensed_provider_count: safeLicensed,
+    }));
   };
 
   const openBillingPortal = async () => {
@@ -6823,6 +6854,9 @@ const RevenueCaptureTool = ({ onBack }) => {
   ].join("\n") : "";
 
   const noteAdditions = analysis ? analysis.suggestions.join("\n") : "";
+  const additionalProviders = Math.max(0, providerCount - 1);
+  const monthlyEstimate = 299 + (additionalProviders * 199);
+  const overLimit = activeProviders > providerCount;
 
   return (
     <div style={{ minHeight: "100vh" }}>
@@ -6854,6 +6888,53 @@ const RevenueCaptureTool = ({ onBack }) => {
                   </span>
                 )}
               </div>
+              <div style={{ display: "flex", gap: "10px", marginTop: "8px", alignItems: "end", flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontSize: "12px", color: DS.colors.textDim, marginBottom: "4px" }}>Licensed providers</div>
+                  <input
+                    type="number"
+                    min={1}
+                    max={200}
+                    value={providerCount}
+                    onChange={(e) => setProviderCount(Math.max(1, parseInt(e.target.value || "1", 10)))}
+                    disabled={billingLoading}
+                    style={{
+                      width: "96px", padding: "8px 10px", borderRadius: DS.radius.sm,
+                      border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bg, color: DS.colors.text,
+                    }}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: "12px", color: DS.colors.textDim, marginBottom: "4px" }}>Active providers</div>
+                  <input
+                    type="number"
+                    min={1}
+                    max={200}
+                    value={activeProviders}
+                    onChange={(e) => setActiveProviders(Math.max(1, parseInt(e.target.value || "1", 10)))}
+                    disabled={billingLoading}
+                    style={{
+                      width: "96px", padding: "8px 10px", borderRadius: DS.radius.sm,
+                      border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bg, color: DS.colors.text,
+                    }}
+                  />
+                </div>
+                <Button small onClick={() => !billingLoading && saveSeatUsage()}>Save Seats</Button>
+              </div>
+              <div style={{ marginTop: "8px", fontSize: "12px", color: DS.colors.textMuted }}>
+                Monthly estimate: <strong style={{ color: DS.colors.text }}>${monthlyEstimate}/mo</strong>
+                {additionalProviders > 0 && (
+                  <span> ({additionalProviders} additional at $199/provider)</span>
+                )}
+              </div>
+              {overLimit && (
+                <div style={{
+                  marginTop: "8px", fontSize: "12px", color: DS.colors.warn,
+                  background: DS.colors.warnDim, borderRadius: DS.radius.sm, padding: "6px 8px",
+                }}>
+                  Active providers exceed licensed seats. Soft warning only for now; upgrade recommended.
+                </div>
+              )}
               <label style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", fontSize: "13px", color: DS.colors.textMuted }}>
                 <input
                   type="checkbox"
@@ -6861,7 +6942,7 @@ const RevenueCaptureTool = ({ onBack }) => {
                   onChange={(e) => setIncludeImplementation(e.target.checked)}
                   disabled={billingLoading || !!billingProfile?.stripe_subscription_id}
                 />
-                Add one-time implementation fee at checkout (optional)
+                Add one-time implementation fee (+$1,500) at checkout (optional)
               </label>
             </div>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>

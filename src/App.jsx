@@ -6357,6 +6357,37 @@ const analyzeEncounterNote = (noteText, billedCode = "99213") => {
   };
 };
 
+const normalizeAuthError = (err, mode = "generic") => {
+  const raw = (err?.message || "").toLowerCase();
+
+  if (!raw) {
+    if (mode === "oauth") return "Sign-in provider failed. Try Google, Microsoft, or email magic link.";
+    if (mode === "password") return "Email or password is incorrect.";
+    return "Unable to complete sign-in. Please try again.";
+  }
+
+  if (raw.includes("rate") || raw.includes("limit") || raw.includes("too many")) {
+    return "Too many login attempts right now. Wait 5-10 minutes or use Google/Microsoft sign-in.";
+  }
+  if (raw.includes("invalid") && raw.includes("email")) {
+    return "Use a valid clinic email format like name@clinic.com.";
+  }
+  if (raw.includes("invalid login credentials") || raw.includes("invalid credentials")) {
+    return "Email or password is incorrect.";
+  }
+  if (raw.includes("network") || raw.includes("fetch")) {
+    return "Network issue while signing in. Check your connection and try again.";
+  }
+  if (raw.includes("provider")) {
+    return "Sign-in provider is not configured yet. Use email login for now.";
+  }
+
+  if (mode === "oauth") return "OAuth sign-in failed. Try again or use email login.";
+  if (mode === "password") return "Email or password is incorrect.";
+  if (mode === "magic") return "Could not send magic link. Try again or use Google/Microsoft.";
+  return "Unable to complete sign-in. Please try again.";
+};
+
 // ============================================================
 // PRACTICE LOGIN
 // ============================================================
@@ -6384,7 +6415,7 @@ const PracticeLogin = ({ onLogin, onBack }) => {
       if (authError) throw authError;
       if (data.user) onLogin(data.user);
     } catch (err) {
-      setError(err.message || "Invalid credentials");
+      setError(normalizeAuthError(err, "password"));
     } finally {
       setLoading(false);
     }
@@ -6409,7 +6440,7 @@ const PracticeLogin = ({ onLogin, onBack }) => {
       if (authError) throw authError;
       setLinkSent(true);
     } catch (err) {
-      setError(err.message || "Failed to send magic link");
+      setError(normalizeAuthError(err, "magic"));
     } finally {
       setLoading(false);
     }
@@ -6435,7 +6466,7 @@ const PracticeLogin = ({ onLogin, onBack }) => {
       });
       if (authError) throw authError;
     } catch (err) {
-      setError(err.message || "OAuth sign-in failed");
+      setError(normalizeAuthError(err, "oauth"));
       setLoading(false);
     }
   };
@@ -6468,8 +6499,12 @@ const PracticeLogin = ({ onLogin, onBack }) => {
         </div>
 
         <div style={{ display: "grid", gap: "10px", marginBottom: "16px" }}>
-          <Button onClick={() => handleOAuth("google")} style={{ width: "100%" }}>Continue with Google</Button>
-          <Button onClick={() => handleOAuth("azure")} style={{ width: "100%" }}>Continue with Microsoft</Button>
+          <Button onClick={() => !loading && handleOAuth("google")} style={{ width: "100%", opacity: loading ? 0.7 : 1 }}>
+            Continue with Google
+          </Button>
+          <Button onClick={() => !loading && handleOAuth("azure")} style={{ width: "100%", opacity: loading ? 0.7 : 1 }}>
+            Continue with Microsoft
+          </Button>
         </div>
 
         <div style={{
@@ -6749,7 +6784,7 @@ const TeamLogin = ({ onLogin, onBack }) => {
         onLogin(data.user);
       }
     } catch (err) {
-      setError(err.message || "Invalid credentials");
+      setError(normalizeAuthError(err, "password"));
     } finally {
       setLoading(false);
     }
@@ -6791,7 +6826,7 @@ const TeamLogin = ({ onLogin, onBack }) => {
       if (authError) {
         // Handle rate limiting specifically
         if (authError.message?.includes("rate") || authError.message?.includes("limit")) {
-          setError("Too many attempts. Try password login or wait a few minutes.");
+          setError(normalizeAuthError(authError, "magic"));
           setUsePassword(true);
         } else {
           throw authError;
@@ -6800,7 +6835,7 @@ const TeamLogin = ({ onLogin, onBack }) => {
       }
       setLinkSent(true);
     } catch (err) {
-      setError(err.message || "Failed to send magic link");
+      setError(normalizeAuthError(err, "magic"));
     } finally {
       setLoading(false);
     }
@@ -6826,7 +6861,7 @@ const TeamLogin = ({ onLogin, onBack }) => {
       });
       if (authError) throw authError;
     } catch (err) {
-      setError(err.message || "OAuth sign-in failed");
+      setError(normalizeAuthError(err, "oauth"));
       setLoading(false);
     }
   };
@@ -6868,10 +6903,10 @@ const TeamLogin = ({ onLogin, onBack }) => {
         </div>
 
         <div style={{ display: "grid", gap: "10px", marginBottom: "16px" }}>
-          <Button onClick={() => handleOAuth("google")} style={{ width: "100%" }}>
+          <Button onClick={() => !loading && handleOAuth("google")} style={{ width: "100%", opacity: loading ? 0.7 : 1 }}>
             Continue with Google
           </Button>
-          <Button onClick={() => handleOAuth("azure")} style={{ width: "100%" }}>
+          <Button onClick={() => !loading && handleOAuth("azure")} style={{ width: "100%", opacity: loading ? 0.7 : 1 }}>
             Continue with Microsoft
           </Button>
         </div>

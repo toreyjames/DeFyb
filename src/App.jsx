@@ -3968,8 +3968,8 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
           {[
+            { label: "Baseline", id: "intake" },
             { label: "ROI", id: "roi" },
-            { label: "Process", id: "protocol" },
             { label: "FAQ", id: "faq" },
           ].map((link) => (
             <span
@@ -4000,27 +4000,23 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
             color: DS.colors.text, fontWeight: 400, lineHeight: 1.1, maxWidth: "700px",
             marginBottom: "24px",
           }}>
-            Your revenue is <span style={{ color: DS.colors.shock, fontStyle: "italic" }}>leaking</span> in documentation.
-            <br />We capture it back.
+            We help doctors code correctly,
+            <br />get paid fully, and save time.
           </h1>
 
-          {/* THREE DOORS */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "40px", maxWidth: "600px" }}>
-            {[
-              { icon: "💰", text: "Your coding level is lower than the encounter supports.", tag: "revenue" },
-              { icon: "🧾", text: "Billing teams lack defensible documentation rationale.", tag: "revenue" },
-              { icon: "📉", text: "Denied or downgraded claims are reducing collections.", tag: "revenue" },
-            ].map((d, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <Tag type={d.tag} />
-                <span style={{ color: DS.colors.textMuted, fontSize: "15px" }}>{d.text}</span>
-              </div>
-            ))}
+          <div style={{ marginBottom: "36px", maxWidth: "720px" }}>
+            <p style={{ color: DS.colors.textMuted, fontSize: "17px", marginBottom: "14px" }}>
+              DeFyb reviews encounter documentation, flags underbilling, and shows exactly what to fix.
+            </p>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <Tag type="time" />
+              <Tag type="revenue" />
+            </div>
           </div>
 
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
             <Button primary onClick={scrollToIntake}>Start Free Coding Baseline →</Button>
-            <Button onClick={() => document.getElementById("roi")?.scrollIntoView({ behavior: "smooth" })}>See the ROI</Button>
+            <Button onClick={onClientLogin}>Watch 2-Min Demo</Button>
           </div>
         </section>
 
@@ -4033,10 +4029,10 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
             fontFamily: DS.fonts.display, fontSize: "clamp(20px, 3vw, 28px)",
             color: DS.colors.textMuted, fontStyle: "italic",
           }}>
-            Capturing revenue private practices are underbilling.
+            Simple workflow. Real coding lift.
           </p>
           <p style={{ fontSize: "14px", color: DS.colors.textDim, marginTop: "8px" }}>
-            Clinician-led billing intelligence and operational automation for small group practices.
+            Run a baseline first. Book a full assessment only if the numbers are compelling.
           </p>
         </div>
 
@@ -4367,7 +4363,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
         </section>
 
         {/* BASELINE + ASSESSMENT */}
-        <section ref={intakeRef} style={{ padding: "80px 0" }}>
+        <section id="intake" ref={intakeRef} style={{ padding: "80px 0" }}>
           <SectionTitle sub="Run a fast estimate first. Book a full assessment only if the coding opportunity is worth it.">
             Start your free coding baseline
           </SectionTitle>

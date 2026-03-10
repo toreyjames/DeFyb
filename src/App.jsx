@@ -6353,6 +6353,23 @@ const TeamLogin = ({ onLogin, onBack }) => {
   const [error, setError] = useState(null);
   const [linkSent, setLinkSent] = useState(false);
 
+  const allowedDomains = (import.meta.env.VITE_ALLOWED_TEAM_DOMAINS || "defyb.org")
+    .split(",")
+    .map((d) => d.trim().toLowerCase())
+    .filter(Boolean);
+  const allowedEmails = (import.meta.env.VITE_ALLOWED_TEAM_EMAILS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+
+  const isAllowedWorkEmail = (candidateEmail = "") => {
+    const normalized = candidateEmail.trim().toLowerCase();
+    if (!normalized.includes("@")) return false;
+    const domain = normalized.split("@")[1];
+    if (allowedEmails.includes(normalized)) return true;
+    return allowedDomains.includes(domain);
+  };
+
   // Common email typos to catch
   const validateEmail = (email) => {
     const typos = ["gmaill.com", "gmial.com", "gamil.com", "gnail.com", "gmail.co", "gmal.com"];
@@ -6370,6 +6387,12 @@ const TeamLogin = ({ onLogin, onBack }) => {
 
     if (!isSupabaseConfigured()) {
       setError("Authentication not configured");
+      setLoading(false);
+      return;
+    }
+
+    if (!isAllowedWorkEmail(email)) {
+      setError("Use your approved clinic/work email address.");
       setLoading(false);
       return;
     }
@@ -6410,6 +6433,12 @@ const TeamLogin = ({ onLogin, onBack }) => {
       return;
     }
 
+    if (!isAllowedWorkEmail(email)) {
+      setError("Use your approved clinic/work email address.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const { error: authError } = await supabase.auth.signInWithOtp({
         email,
@@ -6432,6 +6461,31 @@ const TeamLogin = ({ onLogin, onBack }) => {
     } catch (err) {
       setError(err.message || "Failed to send magic link");
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOAuth = async (provider) => {
+    setLoading(true);
+    setError(null);
+
+    if (!isSupabaseConfigured()) {
+      setError("Authentication not configured");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: window.location.origin + "?team=1",
+          queryParams: provider === "azure" ? { prompt: "select_account" } : undefined,
+        },
+      });
+      if (authError) throw authError;
+    } catch (err) {
+      setError(err.message || "OAuth sign-in failed");
       setLoading(false);
     }
   };
@@ -6470,6 +6524,22 @@ const TeamLogin = ({ onLogin, onBack }) => {
           }}>
             TEAM ACCESS
           </div>
+        </div>
+
+        <div style={{ display: "grid", gap: "10px", marginBottom: "16px" }}>
+          <Button onClick={() => handleOAuth("google")} style={{ width: "100%" }}>
+            Continue with Google
+          </Button>
+          <Button onClick={() => handleOAuth("azure")} style={{ width: "100%" }}>
+            Continue with Microsoft
+          </Button>
+        </div>
+
+        <div style={{
+          fontSize: "11px", color: DS.colors.textDim, marginBottom: "14px",
+          textAlign: "center", textTransform: "uppercase", letterSpacing: "0.08em"
+        }}>
+          or sign in with work email
         </div>
 
         <form onSubmit={usePassword ? handlePasswordLogin : handleMagicLink}>
@@ -6574,12 +6644,30 @@ export default function App() {
   const [teamUser, setTeamUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
+  const allowedDomains = (import.meta.env.VITE_ALLOWED_TEAM_DOMAINS || "defyb.org")
+    .split(",")
+    .map((d) => d.trim().toLowerCase())
+    .filter(Boolean);
+  const allowedEmails = (import.meta.env.VITE_ALLOWED_TEAM_EMAILS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+
+  const isAllowedWorkEmail = (candidateEmail = "") => {
+    const normalized = candidateEmail.trim().toLowerCase();
+    if (!normalized.includes("@")) return false;
+    const domain = normalized.split("@")[1];
+    if (allowedEmails.includes(normalized)) return true;
+    return allowedDomains.includes(domain);
+  };
+
   const isTeamUser = (user) => {
     if (!user) return false;
     const role = (user.app_metadata?.role || user.user_metadata?.role || user.user_metadata?.user_role || "")
       .toString()
       .toLowerCase();
-    return role === "team" || role === "admin" || role === "owner";
+    if (role === "team" || role === "admin" || role === "owner") return true;
+    return isAllowedWorkEmail(user.email || "");
   };
 
   // Check for existing session on mount

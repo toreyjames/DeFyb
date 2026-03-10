@@ -6777,6 +6777,9 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [providerCount, setProviderCount] = useState(1);
   const [activeProviders, setActiveProviders] = useState(1);
   const [reviewDrafts, setReviewDrafts] = useState({});
+  const [queueInput, setQueueInput] = useState("");
+  const [queueItems, setQueueItems] = useState([]);
+  const [currentQueueId, setCurrentQueueId] = useState(null);
 
   const copyText = async (label, text) => {
     if (!text) return;
@@ -6796,7 +6799,7 @@ const RevenueCaptureTool = ({ onBack }) => {
 
       const { data, error: historyError } = await supabase
         .from("encounter_analyses")
-        .select("id, specialty, billed_code, suggested_code, confidence, estimated_delta_per_visit, note_snippet, created_at, rationale, gaps, suggestions, estimated_monthly_recovery, review_status, reviewer_code, reviewer_notes")
+        .select("id, specialty, billed_code, suggested_code, confidence, estimated_delta_per_visit, note_snippet, created_at, rationale, gaps, suggestions, estimated_monthly_recovery, review_status, reviewer_code, reviewer_notes, accepted_code, accepted_at")
         .order("created_at", { ascending: false })
         .limit(20);
 
@@ -6818,6 +6821,8 @@ const RevenueCaptureTool = ({ onBack }) => {
         reviewStatus: row.review_status || "pending",
         reviewerCode: row.reviewer_code || "",
         reviewerNotes: row.reviewer_notes || "",
+        acceptedCode: row.accepted_code || "",
+        acceptedAt: row.accepted_at || null,
       }));
 
       setHistory(mapped);
@@ -6939,7 +6944,7 @@ const RevenueCaptureTool = ({ onBack }) => {
         suggestedCode: row.suggested_code,
         confidence: Number(row.confidence),
         estimatedDeltaPerVisit: Number(row.estimated_delta_per_visit || 0),
-        noteSnippet: row.note_snippet || note.slice(0, 160),
+        noteSnippet: row.note_snippet || "",
         rationale: row.rationale || [],
         gaps: row.gaps || [],
         suggestions: row.suggestions || [],
@@ -6947,9 +6952,12 @@ const RevenueCaptureTool = ({ onBack }) => {
         reviewStatus: row.review_status || "pending",
         reviewerCode: row.reviewer_code || "",
         reviewerNotes: row.reviewer_notes || "",
+        acceptedCode: row.accepted_code || "",
+        acceptedAt: row.accepted_at || null,
       };
 
       setAnalysis({
+        id: mapped.id,
         suggestedCode: mapped.suggestedCode,
         rationale: mapped.rationale,
         confidence: mapped.confidence,
@@ -6959,6 +6967,29 @@ const RevenueCaptureTool = ({ onBack }) => {
         estimatedMonthlyRecovery: mapped.estimatedMonthlyRecovery,
       });
       setHistory((prev) => [mapped, ...prev.filter((p) => p.id !== mapped.id)].slice(0, 20));
+
+      if (currentQueueId) {
+        let nextQueueId = null;
+        let nextQueueText = "";
+        setQueueItems((prev) => {
+          const updated = prev.map((item) => (
+            item.id === currentQueueId
+              ? { ...item, status: "done", result: `${mapped.billedCode}->${mapped.suggestedCode}` }
+              : item
+          ));
+          const currentIndex = updated.findIndex((item) => item.id === currentQueueId);
+          const pendingAfter = updated.slice(currentIndex + 1).find((item) => item.status === "pending");
+          const fallbackPending = updated.find((item) => item.status === "pending");
+          const nextItem = pendingAfter || fallbackPending || null;
+          if (nextItem) {
+            nextQueueId = nextItem.id;
+            nextQueueText = nextItem.text;
+          }
+          return updated;
+        });
+        setCurrentQueueId(nextQueueId);
+        if (nextQueueText) setNote(nextQueueText);
+      }
     } catch (err) {
       setError(err.message || "Analysis failed. Please try again.");
     } finally {
@@ -6989,6 +7020,76 @@ const RevenueCaptureTool = ({ onBack }) => {
   const reviewedCases = history.filter((h) => h.reviewStatus && h.reviewStatus !== "pending");
   const agreeCases = reviewedCases.filter((h) => h.reviewStatus === "agree");
   const agreementRate = reviewedCases.length > 0 ? Math.round((agreeCases.length / reviewedCases.length) * 100) : 0;
+  const queuePendingCount = queueItems.filter((item) => item.status === "pending").length;
+  const queueDoneCount = queueItems.filter((item) => item.status === "done").length;
+
+  const loadQueue = () => {
+    const parsed = queueInput
+      .split(/\n-{3,}\n/g)
+      .map((chunk) => chunk.trim())
+      .filter(Boolean)
+      .map((text, idx) => ({
+        id: `q-${Date.now()}-${idx}`,
+        text,
+        status: "pending",
+        result: "",
+      }));
+
+    setQueueItems(parsed);
+    if (parsed.length > 0) {
+      setCurrentQueueId(parsed[0].id);
+      setNote(parsed[0].text);
+      setCopied(`Queue loaded: ${parsed.length} encounters`);
+      setTimeout(() => setCopied(""), 1400);
+    }
+  };
+
+  const clearQueue = () => {
+    setQueueItems([]);
+    setCurrentQueueId(null);
+    setQueueInput("");
+  };
+
+  const handleFinalizeEncounter = async () => {
+    if (!analysis) return;
+    const packet = [
+      `Finalized code: ${analysis.suggestedCode}`,
+      `Original billed code: ${billedCode}`,
+      "",
+      "Justification:",
+      ...analysis.rationale.map((r) => `- ${r}`),
+      "",
+      "Documentation additions:",
+      ...(analysis.suggestions.length > 0 ? analysis.suggestions : ["- No additional text required."]),
+      "",
+      `Estimated delta per visit: $${analysis.estimatedDeltaPerVisit}`,
+      `Estimated monthly recovery: $${analysis.estimatedMonthlyRecovery.toLocaleString()}`,
+    ].join("\n");
+
+    await copyText("Finalized packet copied", packet);
+
+    if (!isSupabaseConfigured() || !analysis.id) return;
+
+    const acceptedAt = new Date().toISOString();
+    const { error: updateError } = await supabase
+      .from("encounter_analyses")
+      .update({
+        accepted_code: analysis.suggestedCode,
+        accepted_at: acceptedAt,
+      })
+      .eq("id", analysis.id);
+
+    if (updateError) {
+      setError(updateError.message || "Could not save finalization.");
+      return;
+    }
+
+    setHistory((prev) => prev.map((h) => (
+      h.id === analysis.id
+        ? { ...h, acceptedCode: analysis.suggestedCode, acceptedAt }
+        : h
+    )));
+  };
 
   const setReviewField = (analysisId, field, value) => {
     setReviewDrafts((prev) => ({
@@ -7133,11 +7234,69 @@ const RevenueCaptureTool = ({ onBack }) => {
           </div>
         </Card>
 
+        <Card style={{ marginBottom: "14px" }}>
+          <div style={{ fontWeight: 600, marginBottom: "8px" }}>Queue Mode (Rapid Review)</div>
+          <div style={{ fontSize: "12px", color: DS.colors.textMuted, marginBottom: "8px" }}>
+            Paste multiple encounters separated by a line with `---`, then process them one by one.
+          </div>
+          <textarea
+            value={queueInput}
+            onChange={(e) => setQueueInput(e.target.value)}
+            placeholder={"Encounter 1...\n---\nEncounter 2...\n---\nEncounter 3..."}
+            style={{
+              width: "100%",
+              minHeight: "120px",
+              resize: "vertical",
+              padding: "10px",
+              borderRadius: DS.radius.sm,
+              border: `1px solid ${DS.colors.borderLight}`,
+              background: DS.colors.bg,
+              color: DS.colors.text,
+              fontSize: "13px",
+              marginBottom: "8px",
+            }}
+          />
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+            <Button small onClick={loadQueue}>Load Queue</Button>
+            <Button small onClick={clearQueue}>Clear Queue</Button>
+            <span style={{ fontSize: "12px", color: DS.colors.textMuted }}>
+              Pending: {queuePendingCount} · Done: {queueDoneCount}
+            </span>
+          </div>
+          {queueItems.length > 0 && (
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "10px" }}>
+              {queueItems.map((item, idx) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => { setCurrentQueueId(item.id); setNote(item.text); }}
+                  style={{
+                    padding: "5px 8px",
+                    borderRadius: DS.radius.sm,
+                    border: `1px solid ${currentQueueId === item.id ? DS.colors.shock : DS.colors.border}`,
+                    background: currentQueueId === item.id ? DS.colors.shockGlow : DS.colors.bg,
+                    color: currentQueueId === item.id ? DS.colors.shock : DS.colors.textMuted,
+                    cursor: "pointer",
+                    fontSize: "11px",
+                  }}
+                >
+                  #{idx + 1} {item.status === "done" ? "✓" : "•"}
+                </button>
+              ))}
+            </div>
+          )}
+        </Card>
+
         <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "14px" }}>
           <Card>
             <div style={{ fontSize: "12px", color: DS.colors.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>
               Encounter Note
             </div>
+            {currentQueueId && (
+              <div style={{ marginBottom: "8px", fontSize: "12px", color: DS.colors.shock }}>
+                Queue item active. Running analysis will auto-advance to the next pending encounter.
+              </div>
+            )}
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -7282,9 +7441,19 @@ const RevenueCaptureTool = ({ onBack }) => {
                 ))}
               </div>
               <div style={{ marginTop: "12px" }}>
-                <Button small onClick={() => copyText("Copied billing summary", billingSummary)}>
-                  Copy Billing Summary
-                </Button>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <Button small onClick={() => copyText("Copied billing summary", billingSummary)}>
+                    Copy Billing Summary
+                  </Button>
+                  <Button small onClick={handleFinalizeEncounter} style={{ background: DS.colors.vital, border: "none" }}>
+                    Finalize + Copy Packet
+                  </Button>
+                </div>
+                {analysis.id && history.find((h) => h.id === analysis.id)?.acceptedAt && (
+                  <div style={{ marginTop: "8px", fontSize: "12px", color: DS.colors.vital }}>
+                    Finalized at {new Date(history.find((h) => h.id === analysis.id).acceptedAt).toLocaleString()}
+                  </div>
+                )}
               </div>
             </Card>
             <Card>
@@ -7410,6 +7579,11 @@ const RevenueCaptureTool = ({ onBack }) => {
                       </div>
                       <div style={{ fontSize: "12px", color: DS.colors.vital, fontWeight: 500 }}>
                         +${h.estimatedDeltaPerVisit}/visit
+                        {h.acceptedAt && (
+                          <div style={{ marginTop: "4px", fontSize: "11px", color: DS.colors.vital }}>
+                            Finalized: {h.acceptedCode || h.suggestedCode}
+                          </div>
+                        )}
                         <div style={{
                           marginTop: "6px",
                           fontSize: "11px",

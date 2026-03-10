@@ -491,23 +491,19 @@ const PortfolioCharts = ({ practices }) => {
 
 // --- DATA ---
 const FAILURE_POINTS = [
-  { id: 1, name: "Missed Calls", stat: "40-70% unanswered", tag: "staffing", tool: "AI Phone Agent", toolCost: "$500-800/mo", fix: "100% answer rate, 24/7" },
-  { id: 2, name: "Documentation", stat: "16 min/patient avg", tag: "time", tool: "Ambient AI Scribe", toolCost: "$49-299/mo/provider", fix: "10-second notes, zero pajama time" },
-  { id: 3, name: "Under-Coding", stat: "25-50% of visits", tag: "revenue", tool: "AI Coding Engine", toolCost: "Included w/ scribe", fix: "11-14% wRVU increase" },
-  { id: 4, name: "Prior Auth", stat: "14 hrs/week/provider", tag: "time", tool: "PA Automation", toolCost: "$300-600/mo", fix: "Auto-submit, track, appeal" },
-  { id: 5, name: "Claim Denials", stat: "8-12% denial rate", tag: "revenue", tool: "Claims AI", toolCost: "$200-400/mo", fix: "Pre-submission scrub, auto-appeal" },
-  { id: 6, name: "No Follow-Through", stat: "~30% no-show rate", tag: "staffing", tool: "Patient Engagement AI", toolCost: "$150-300/mo", fix: "Automated outreach, care gap closure" },
-  { id: 7, name: "Referral Black Hole", stat: "No closed loop", tag: "revenue", tool: "Referral Tracker", toolCost: "Included w/ engagement AI", fix: "Auto-track, auto-remind" },
-  { id: 8, name: "No Chart Prep", stat: "Provider walks in cold", tag: "time", tool: "Pre-Visit Intelligence", toolCost: "Included w/ scribe platform", fix: "30-sec briefing before every visit" },
+  { id: 1, name: "Under-Coding", stat: "25-50% of visits", tag: "revenue", tool: "AI Coding Intelligence", toolCost: "Core platform", fix: "11-14% wRVU lift potential" },
+  { id: 2, name: "Weak Code Evidence", stat: "MDM not fully documented", tag: "revenue", tool: "Documentation Gap Engine", toolCost: "Core platform", fix: "Clear rationale bullets per claim" },
+  { id: 3, name: "Denials from Documentation", stat: "8-12% denial trend", tag: "revenue", tool: "Pre-Submit Billing Review", toolCost: "Core platform", fix: "Cleaner first-pass acceptance" },
+  { id: 4, name: "Manual Chart Review", stat: "Slow QA throughput", tag: "time", tool: "Encounter Review Queue", toolCost: "Core platform", fix: "Faster review with priority scoring" },
+  { id: 5, name: "Missed Revenue Visibility", stat: "No daily capture dashboard", tag: "revenue", tool: "Revenue Capture Dashboard", toolCost: "Core platform", fix: "Real-time underbilling visibility" },
 ];
 
 const PROTOCOL_STEPS = [
-  { num: "01", title: "Intake", desc: "Practice fills a quick form. We already know the diagnosis.", time: "5 min" },
-  { num: "02", title: "Confirm", desc: "Half-day audit + AI environment assessment. Room acoustics, device placement, workflow timing.", time: "½ day" },
-  { num: "03", title: "Prove", desc: "Side-by-side parallel run on their own patients. Undeniable.", time: "1 day" },
-  { num: "04", title: "Deliver", desc: "72-Hour Note. One page. Here's what's broken, here's the fix, here's the dollars.", time: "72 hrs" },
-  { num: "05", title: "Transform", desc: "Tuesday Transform — one day/week runs the new stack. Staff asks to expand.", time: "2-3 wks" },
-  { num: "06", title: "Sustain", desc: "Monthly scorecard. Live portal. Ongoing optimization. Rhythm restored.", time: "∞" },
+  { num: "01", title: "Baseline", desc: "Import 20-50 recent encounters and compare billed vs supported coding levels.", time: "1 day" },
+  { num: "02", title: "Detect", desc: "Identify undercoded visits and documentation gaps by provider and visit type.", time: "2 days" },
+  { num: "03", title: "Justify", desc: "Generate evidence bullets and compliant note additions for billing review.", time: "same day" },
+  { num: "04", title: "Capture", desc: "Route corrected coding recommendations to billing with audit-ready context.", time: "ongoing" },
+  { num: "05", title: "Expand", desc: "Layer in optional modules like DME, prior-auth, and claims automation after coding wins.", time: "phase 2" },
 ];
 
 const SAMPLE_CLIENTS = [
@@ -3990,9 +3986,9 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
           {/* THREE DOORS */}
           <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "40px", maxWidth: "600px" }}>
             {[
-              { icon: "⏱", text: "Providers charting until 9 PM while the family waits.", tag: "time" },
-              { icon: "👥", text: "That front desk position has been posted for 6 months.", tag: "staffing" },
-              { icon: "💰", text: "Revenue walking out the door to third parties.", tag: "revenue" },
+              { icon: "💰", text: "Your coding level is lower than the encounter supports.", tag: "revenue" },
+              { icon: "🧾", text: "Billing teams lack defensible documentation rationale.", tag: "revenue" },
+              { icon: "📉", text: "Denied or downgraded claims are reducing collections.", tag: "revenue" },
             ].map((d, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <Tag type={d.tag} />
@@ -4023,10 +4019,10 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
           </p>
         </div>
 
-        {/* 8 FAILURE POINTS → MAPPED TO TOOLS */}
+        {/* CODING LEAKS */}
         <section style={{ padding: "80px 0" }}>
-          <SectionTitle sub="Every practice has at least 6 of these. We already know the diagnosis before we walk in.">
-            The 8 things killing your practice
+          <SectionTitle sub="We focus frontend workflow on coding intelligence first. Add-on modules remain available in your backend roadmap.">
+            The 5 coding leaks draining revenue
           </SectionTitle>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "12px" }}>
@@ -4074,8 +4070,8 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
             <div>
               <div style={{ fontWeight: 600, fontSize: "14px" }}>AI Environment Audit — included in every assessment</div>
               <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
-                Room acoustics, device placement, ambient noise, provider habits. The AI is only as good as what it hears.
-                We optimize the room so the tools actually work.
+                We start with coding capture. DME, prior-auth, and broader automation modules are layered in phase two
+                after baseline coding lift is proven.
               </div>
             </div>
           </div>
@@ -4083,8 +4079,8 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
 
         {/* ROI SECTION */}
         <section id="roi" style={{ padding: "80px 0" }}>
-          <SectionTitle sub="Based on published clinical studies — your results will vary by specialty, payer mix, and current state.">
-            What the research shows for a 5-provider practice
+          <SectionTitle sub="Coding-first projections based on published benchmarks. Results vary by specialty and payer mix.">
+            What revenue capture can look like for a 5-provider practice
           </SectionTitle>
 
           {/* SIMPLE PAY → GET */}
@@ -4103,7 +4099,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
                 color: DS.colors.text, lineHeight: 1,
               }}>~$146K</div>
               <div style={{ fontSize: "14px", color: DS.colors.textDim, marginTop: "8px" }}>
-                per year — tools + DeFyb service
+                per year — DeFyb core coding platform
               </div>
             </Card>
 
@@ -4125,7 +4121,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
                 color: DS.colors.vital, lineHeight: 1,
               }}>$400K–1M+</div>
               <div style={{ fontSize: "14px", color: DS.colors.textDim, marginTop: "8px" }}>
-                per year — based on published outcomes
+                per year — underbilling recovery potential
               </div>
             </Card>
           </div>
@@ -4138,11 +4134,11 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
             }}>Where practices are seeing returns (published data)</div>
             <div style={{ display: "grid", gap: "2px" }}>
               {[
-                { source: "Coding uplift", amount: "up to $625K", note: "11–14% wRVU increase reported in JAMA, PMC studies" },
-                { source: "DME capture", amount: "varies widely", note: "Specialty-dependent — ortho/pain see the most" },
-                { source: "Denial recovery", amount: "$60–96K", note: "Industry avg 8–12% denial rate → 3–5% with AI scrub" },
-                { source: "Answered calls", amount: "$45K+", note: "Recovering patients lost to voicemail" },
-                { source: "Staff efficiency", amount: "$84–96K", note: "Reduced need for phone/auth/follow-up FTEs" },
+                { source: "Coding uplift", amount: "up to $625K", note: "11-14% wRVU increase reported in published studies" },
+                { source: "Denial prevention", amount: "$60-96K", note: "Cleaner documentation reduces preventable denials" },
+                { source: "Faster review cycles", amount: "high impact", note: "Billing teams spend less time clarifying notes" },
+                { source: "Audit-ready claims", amount: "risk reduction", note: "Each recommendation includes evidence bullets" },
+                { source: "Phase 2 add-ons", amount: "optional", note: "DME and prior-auth modules can layer in later" },
               ].map((row, i) => (
                 <div key={i} style={{
                   display: "grid", gridTemplateColumns: "160px 120px 1fr",
@@ -4166,15 +4162,15 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
           }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontFamily: DS.fonts.display, fontSize: "28px", color: DS.colors.vital }}>3–5x</div>
-              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>typical ROI range</div>
+              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>typical coding ROI range</div>
             </div>
             <div style={{ textAlign: "center", borderLeft: `1px solid ${DS.colors.border}`, borderRight: `1px solid ${DS.colors.border}` }}>
               <div style={{ fontFamily: DS.fonts.display, fontSize: "28px", color: DS.colors.shock }}>60–90 days</div>
-              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>to measurable impact</div>
+              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>to measurable coding impact</div>
             </div>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontFamily: DS.fonts.display, fontSize: "28px", color: DS.colors.blue }}>1–2 hrs</div>
-              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>back per provider/day</div>
+              <div style={{ fontFamily: DS.fonts.display, fontSize: "28px", color: DS.colors.blue }}>Daily</div>
+              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>underbilling visibility</div>
             </div>
           </div>
 
@@ -4186,16 +4182,16 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
 
         {/* PROJECTED OUTCOMES */}
         <section style={{ padding: "80px 0", borderTop: `1px solid ${DS.colors.border}` }}>
-          <SectionTitle sub="Based on tool capabilities and published clinical outcomes.">
-            What practices can expect
+          <SectionTitle sub="Front-end focus is coding and revenue capture.">
+            Expected coding outcomes
           </SectionTitle>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "16px" }}>
             {[
-              { metric: "2+ hours/day", label: "reclaimed per provider", icon: "⏱", color: DS.colors.blue, sub: "with AI scribing" },
-              { metric: "3-5%", label: "denial rate reduction", icon: "📉", color: DS.colors.vital, sub: "with claims automation" },
-              { metric: "95%+", label: "call answer rate", icon: "📞", color: DS.colors.warn, sub: "with AI phone handling" },
-              { metric: "10-15x", label: "first-year ROI", icon: "📈", color: DS.colors.shock, sub: "typical implementation" },
+              { metric: "11-14%", label: "coding uplift potential", icon: "📈", color: DS.colors.vital, sub: "from undercoding correction" },
+              { metric: "60-90 days", label: "to trend visibility", icon: "📊", color: DS.colors.blue, sub: "for measured capture rates" },
+              { metric: "Defensible", label: "claim rationale quality", icon: "🧾", color: DS.colors.warn, sub: "evidence-linked recommendations" },
+              { metric: "Phase 2", label: "add-on modules", icon: "⚙️", color: DS.colors.shock, sub: "DME and prior-auth available later" },
             ].map((item, i) => (
               <Card key={i} style={{ textAlign: "center", padding: "32px 24px" }}>
                 <div style={{ fontSize: "32px", marginBottom: "12px" }}>{item.icon}</div>
@@ -4223,8 +4219,8 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
                 These are projections, not guarantees
               </div>
               <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
-                Every practice is different. During your assessment, we'll build a realistic ROI model based on your
-                specific specialty, payer mix, current metrics, and selected tools.
+                Every practice is different. We validate coding opportunity first, then phase in DME, prior-auth,
+                and additional automations as optional expansion modules.
               </div>
             </div>
           </div>
@@ -4232,7 +4228,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
 
         {/* INTEGRATIONS */}
         <section style={{ padding: "80px 0", borderTop: `1px solid ${DS.colors.border}` }}>
-          <SectionTitle sub="We work with your existing systems and proven AI vendors.">
+          <SectionTitle sub="Coding-first implementation on your existing stack, with optional add-on modules.">
             Integrations & Partners
           </SectionTitle>
 
@@ -4261,9 +4257,9 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
                 { name: "Suki", category: "Scribe" },
                 { name: "Ambience", category: "Scribe" },
                 { name: "HealOS", category: "Scribe" },
-                { name: "Assort Health", category: "Phone AI" },
                 { name: "Thoughtful AI", category: "RCM" },
-                { name: "Infinitus", category: "Prior Auth" },
+                { name: "Infinitus", category: "Prior Auth (Add-On)" },
+                { name: "Assort Health", category: "Phone AI (Add-On)" },
               ].map((tool) => (
                 <div key={tool.name} style={{
                   padding: "12px 20px", background: DS.colors.bgCard, border: `1px solid ${DS.colors.border}`,
@@ -4281,8 +4277,8 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
 
         {/* PROTOCOL */}
         <section id="protocol" style={{ padding: "80px 0" }}>
-          <SectionTitle sub="Six steps. First client to managed service in under 60 days.">
-            The DeFyb Protocol
+          <SectionTitle sub="Simple, coding-first rollout.">
+            The Revenue Capture Protocol
           </SectionTitle>
 
           <div style={{ display: "grid", gap: "2px" }}>
@@ -4321,24 +4317,24 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
           <div style={{ display: "grid", gap: "12px", maxWidth: "700px" }}>
             {[
               {
-                q: "Does this work with my EHR?",
-                a: "Yes. We work with athenahealth, Epic, eClinicalWorks, NextGen, AdvancedMD, and most others. The AI tools integrate via existing EHR APIs or run alongside your workflow."
+                q: "Is this a coding tool or a full automation platform?",
+                a: "The frontend experience is intentionally coding-first for MVP. We prioritize underbilling detection, claim rationale, and documentation completion."
               },
               {
-                q: "How is this different from just buying the tools myself?",
-                a: "You could buy them yourself. Most practices do, and most implementations fail. We handle vendor selection, environment setup, staff training, workflow integration, and ongoing optimization. You get the results without the project management."
+                q: "Do you still support DME and prior-auth automation?",
+                a: "Yes. Those capabilities remain in the backend roadmap and can be activated as phase-two add-on modules after coding capture is stable."
               },
               {
                 q: "What does it actually cost?",
-                a: "Tool costs vary by stack — typically $1,500–3,000/month for a 5-provider practice. DeFyb's service fee is on top of that. We'll give you a specific quote during the assessment based on what you actually need."
+                a: "Core MVP pricing is centered on coding intelligence and revenue capture workflows. We provide expansion pricing for DME, prior-auth, and claims modules separately."
               },
               {
                 q: "How long until we see results?",
-                a: "Documentation time typically drops immediately — usually day one. Revenue impact (coding uplift, denial reduction) takes longer to measure, usually 60–90 days to see clear trends."
+                a: "Most practices see coding trend visibility within 2-4 weeks and measurable revenue impact within 60-90 days."
               },
               {
-                q: "What if my staff resists the change?",
-                a: "They usually do, at first. That's why we start with Tuesday Transform — one day a week on the new stack. Staff sees the tools work, asks to expand. Change happens through proof, not mandate."
+                q: "Will this replace my billing team?",
+                a: "No. It augments your billing team with better evidence, cleaner documentation, and prioritized correction opportunities."
               },
             ].map((faq, i) => (
               <Card key={i} style={{ padding: "20px 24px" }}>

@@ -22,9 +22,18 @@ const useConfig = () => {
 // Default config (fallback when Edge Config unavailable)
 const DEFAULT_CONFIG = {
   aiTools: [
+    { id: "coding_core", name: "DeFyb Coding Core", category: "revenue", cost: 299 },
     { id: "suki", name: "Suki AI Scribe", category: "scribe", cost: 299 },
-    { id: "ambience", name: "Ambience Scribe", category: "scribe", cost: 299 },
-    { id: "healos", name: "HealOS Scribe", category: "scribe", cost: 199 },
+    { id: "ambience", name: "Ambience (Optional Scribe)", category: "scribe", cost: 299 },
+    { id: "healos", name: "HealOS (Optional Scribe)", category: "scribe", cost: 199 },
+    { id: "abridge", name: "Abridge (Optional Scribe)", category: "scribe", cost: 350 },
+    { id: "dax", name: "Nuance DAX (Optional Scribe)", category: "scribe", cost: 650 },
+    { id: "nabla", name: "Nabla (Optional Scribe)", category: "scribe", cost: 249 },
+    { id: "deepscribe", name: "DeepScribe (Optional Scribe)", category: "scribe", cost: 249 },
+    { id: "augmedix", name: "Augmedix (Optional Scribe)", category: "scribe", cost: 399 },
+    { id: "freed", name: "Freed (Optional Scribe)", category: "scribe", cost: 99 },
+    { id: "heidi", name: "Heidi (Optional Scribe)", category: "scribe", cost: 99 },
+    { id: "dragon", name: "Microsoft Dragon Copilot (Optional Scribe)", category: "scribe", cost: 699 },
     { id: "assort", name: "Assort Health Phone", category: "phone", cost: 650 },
     { id: "claims", name: "Claims AI", category: "revenue", cost: 300 },
     { id: "pa", name: "PA Automation", category: "workflow", cost: 450 },
@@ -566,9 +575,18 @@ const STAGES = [
 
 // Predefined AI tools for implementation
 const AI_TOOLS = [
+  { id: "coding_core", name: "DeFyb Coding Core", category: "revenue", cost: 299 },
   { id: "suki", name: "Suki AI Scribe", category: "scribe", cost: 299 },
-  { id: "ambience", name: "Ambience Scribe", category: "scribe", cost: 299 },
-  { id: "healos", name: "HealOS Scribe", category: "scribe", cost: 199 },
+  { id: "ambience", name: "Ambience (Optional Scribe)", category: "scribe", cost: 299 },
+  { id: "healos", name: "HealOS (Optional Scribe)", category: "scribe", cost: 199 },
+  { id: "abridge", name: "Abridge (Optional Scribe)", category: "scribe", cost: 350 },
+  { id: "dax", name: "Nuance DAX (Optional Scribe)", category: "scribe", cost: 650 },
+  { id: "nabla", name: "Nabla (Optional Scribe)", category: "scribe", cost: 249 },
+  { id: "deepscribe", name: "DeepScribe (Optional Scribe)", category: "scribe", cost: 249 },
+  { id: "augmedix", name: "Augmedix (Optional Scribe)", category: "scribe", cost: 399 },
+  { id: "freed", name: "Freed (Optional Scribe)", category: "scribe", cost: 99 },
+  { id: "heidi", name: "Heidi (Optional Scribe)", category: "scribe", cost: 99 },
+  { id: "dragon", name: "Microsoft Dragon Copilot (Optional Scribe)", category: "scribe", cost: 699 },
   { id: "assort", name: "Assort Health Phone", category: "phone", cost: 650 },
   { id: "claims", name: "Claims AI", category: "revenue", cost: 300 },
   { id: "pa", name: "PA Automation", category: "workflow", cost: 450 },
@@ -666,18 +684,18 @@ const ROI_BENCHMARKS = {
 
 // Map pain points to recommended tools
 const PAIN_TO_TOOL_MAP = {
-  "Documentation time": ["suki", "ambience", "healos"],
+  "Documentation time": ["coding_core", "suki", "ambience", "healos", "abridge", "dax", "nabla", "deepscribe", "augmedix", "freed", "heidi", "dragon"],
   "Phone/missed calls": ["assort"],
-  "Coding accuracy": ["suki", "ambience"], // scribes include coding
+  "Coding accuracy": ["coding_core", "claims"],
   "Prior auth": ["pa"],
   "Claim denials": ["claims"],
   "Staffing shortages": ["assort", "pa"], // automation helps
   "DME revenue loss": ["dme"],
   "Patient no-shows": [], // future: engagement AI
-  "Providers working late": ["suki", "ambience", "healos"],
+  "Providers working late": ["coding_core", "suki", "ambience", "healos", "abridge", "dax", "nabla", "deepscribe", "augmedix", "freed", "heidi", "dragon"],
   "Missing/losing calls": ["assort"],
   "High denial rate": ["claims"],
-  "Under-coding concerns": ["suki", "ambience"],
+  "Under-coding concerns": ["coding_core", "claims"],
   "Prior auth burden": ["pa"],
   "Staffing struggles": ["assort", "pa"],
   "Want to bring DME in-house": ["dme"],
@@ -696,15 +714,11 @@ const calculateROIProjection = (practice) => {
 
   // Determine recommended tools
   const recommendedToolIds = new Set();
+  recommendedToolIds.add("coding_core");
   allConcerns.forEach(concern => {
     const tools = PAIN_TO_TOOL_MAP[concern] || [];
     tools.forEach(t => recommendedToolIds.add(t));
   });
-
-  // Always recommend at least a scribe if nothing else
-  if (recommendedToolIds.size === 0) {
-    recommendedToolIds.add("suki");
-  }
 
   const recommendedTools = AI_TOOLS.filter(t => recommendedToolIds.has(t.id));
 
@@ -5391,6 +5405,7 @@ const TeamDashboard = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [modalType, setModalType] = useState(null); // 'baseline', 'implementation', 'golive', 'metrics', 'quote'
   const [selectedQuote, setSelectedQuote] = useState(null);
+  const [pipelineFocus, setPipelineFocus] = useState("all");
 
   const refreshPractices = async () => {
     if (!isSupabaseConfigured()) return;
@@ -5487,6 +5502,7 @@ const TeamDashboard = ({ onBack }) => {
     ai_stack: p.ai_stack || [],
     go_live_date: p.go_live_date,
     portal_enabled: p.portal_enabled,
+    portal_login_count: p.portal_login_count || 0,
     // Activity
     activity_log: p.activity_log || [],
     metrics: {
@@ -5587,6 +5603,27 @@ const TeamDashboard = ({ onBack }) => {
   const practicesWithCaptureSignals = practices.filter((p) =>
     (p.denial_rate_baseline || 0) > 0 || (p.em_coding_distribution || "").length > 0
   ).length;
+  const totalProviders = practices.reduce((sum, p) => sum + (Number(p.provider_count) || 0), 0);
+  const largestPracticeByProviders = practices.reduce((best, p) => {
+    if (!best) return p;
+    return (Number(p.provider_count) || 0) > (Number(best.provider_count) || 0) ? p : best;
+  }, null);
+  const topSavingsPractice = practices.reduce((best, p) => {
+    if (!best) return p;
+    const current = (p.coding_uplift_monthly || 0) + (p.revenue_recovered_monthly || 0);
+    const bestValue = (best.coding_uplift_monthly || 0) + (best.revenue_recovered_monthly || 0);
+    return current > bestValue ? p : best;
+  }, null);
+  const mostActivePractice = practices.reduce((best, p) => {
+    if (!best) return p;
+    return (p.portal_login_count || 0) > (best.portal_login_count || 0) ? p : best;
+  }, null);
+  const pipelinePractices = practices.filter((p) => {
+    if (pipelineFocus === "capture") {
+      return (p.denial_rate_baseline || 0) > 0 || (p.em_coding_distribution || "").length > 0;
+    }
+    return true;
+  });
 
   return (
     <div style={{ minHeight: "100vh" }}>
@@ -5611,11 +5648,62 @@ const TeamDashboard = ({ onBack }) => {
       <div style={{ padding: "80px clamp(20px, 5vw, 60px) 40px", maxWidth: "1400px", margin: "0 auto" }}>
 
         {/* TOP STATS */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "10px", marginBottom: "24px" }}>
-          <MetricCard small label="Monthly Coding Lift" value={`$${(totalCodingLift / 1000).toFixed(0)}K`} color={DS.colors.vital} />
-          <MetricCard small label="Monthly Recovered Rev" value={`$${(totalRecoveredRevenue / 1000).toFixed(0)}K`} color={DS.colors.vital} />
-          <MetricCard small label="Capture-Signal Practices" value={practicesWithCaptureSignals.toString()} color={DS.colors.shock} />
-          <MetricCard small label="Total Practices" value={practices.length.toString()} color={DS.colors.blue} />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "10px", marginBottom: "10px" }}>
+          <button
+            type="button"
+            onClick={() => { setView("finances"); setSelectedClient(null); }}
+            style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer" }}
+            title="Open Revenue Capture view"
+          >
+            <MetricCard small label="Monthly Coding Lift" value={`$${(totalCodingLift / 1000).toFixed(0)}K`} color={DS.colors.vital} />
+          </button>
+          <button
+            type="button"
+            onClick={() => { setView("finances"); setSelectedClient(null); }}
+            style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer" }}
+            title="Open Revenue Capture view"
+          >
+            <MetricCard small label="Monthly Recovered Rev" value={`$${(totalRecoveredRevenue / 1000).toFixed(0)}K`} color={DS.colors.vital} />
+          </button>
+          <button
+            type="button"
+            onClick={() => { setView("pipeline"); setPipelineFocus("capture"); setSelectedClient(null); }}
+            style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer" }}
+            title="Filter Pipeline to capture-signal practices"
+          >
+            <MetricCard small label="Capture-Signal Practices" value={practicesWithCaptureSignals.toString()} color={DS.colors.shock} />
+          </button>
+          <button
+            type="button"
+            onClick={() => { setView("pipeline"); setPipelineFocus("all"); setSelectedClient(null); }}
+            style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer" }}
+            title="Open full pipeline"
+          >
+            <MetricCard small label="Total Practices" value={practices.length.toString()} color={DS.colors.blue} />
+          </button>
+        </div>
+
+        {/* PRACTICE LEADERS */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "10px", marginBottom: "24px" }}>
+          <MetricCard small label="Registered Providers" value={totalProviders.toString()} color={DS.colors.blue} />
+          <MetricCard
+            small
+            label="Largest Practice"
+            value={largestPracticeByProviders ? `${largestPracticeByProviders.name} (${largestPracticeByProviders.provider_count || 0})` : "N/A"}
+            color={DS.colors.textMuted}
+          />
+          <MetricCard
+            small
+            label="Top Savings Practice"
+            value={topSavingsPractice ? `${topSavingsPractice.name} ($${(((topSavingsPractice.coding_uplift_monthly || 0) + (topSavingsPractice.revenue_recovered_monthly || 0)) / 1000).toFixed(0)}K/mo)` : "N/A"}
+            color={DS.colors.vital}
+          />
+          <MetricCard
+            small
+            label="Most Active Practice"
+            value={mostActivePractice ? `${mostActivePractice.name} (${mostActivePractice.portal_login_count || 0} logins)` : "N/A"}
+            color={DS.colors.shock}
+          />
         </div>
 
         {/* VIEW TOGGLE */}
@@ -5638,57 +5726,91 @@ const TeamDashboard = ({ onBack }) => {
               Loading practices...
             </div>
           ) : (
-          <div className="fade-in" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px" }}>
-            {STAGES.map((stage) => (
-              <div key={stage.key}>
-                <div style={{
-                  fontSize: "11px", color: stage.color, textTransform: "uppercase",
-                  letterSpacing: "0.08em", fontWeight: 600, marginBottom: "10px",
-                  display: "flex", alignItems: "center", gap: "6px",
-                }}>
-                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: stage.color }} />
-                  {stage.label}
-                  <span style={{ color: DS.colors.textDim, fontWeight: 400 }}>
-                    ({practices.filter((c) => c.stage === stage.key).length})
-                  </span>
-                </div>
-                <div style={{ display: "grid", gap: "8px" }}>
-                  {practices.filter((c) => c.stage === stage.key).map((c) => (
-                    <div key={c.id} onClick={() => setSelectedClient(c)} style={{
-                      padding: "14px 16px", background: DS.colors.bgCard,
-                      border: `1px solid ${DS.colors.border}`, borderRadius: DS.radius.md,
-                      cursor: "pointer", transition: "border-color 0.2s",
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.borderColor = DS.colors.borderLight}
-                    onMouseOut={(e) => e.currentTarget.style.borderColor = DS.colors.border}
-                    >
-                      {/* Lead Score Badge for leads */}
-                      {c.stage === "lead" && c.lead_score && (
-                        <div style={{ marginBottom: "8px" }}>
-                          <LeadScoreBadge score={c.lead_score} size="small" />
-                        </div>
-                      )}
-                      <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "4px" }}>{c.name}</div>
-                      <div style={{ fontSize: "11px", color: DS.colors.textMuted }}>{c.providers} providers · {c.specialty}</div>
-                      <div style={{ fontSize: "11px", color: DS.colors.textDim, marginTop: "2px" }}>{c.ehr}</div>
-                      {c.score && (
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "8px" }}>
-                          <div style={{
-                            width: "60px", height: "4px", background: DS.colors.border, borderRadius: "2px", overflow: "hidden",
-                          }}>
-                            <div style={{
-                              width: `${c.score}%`, height: "100%", borderRadius: "2px",
-                              background: c.score >= 80 ? DS.colors.vital : c.score >= 60 ? DS.colors.warn : DS.colors.danger,
-                            }} />
+          <div className="fade-in">
+            <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
+              <button
+                type="button"
+                onClick={() => setPipelineFocus("all")}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: DS.radius.sm,
+                  border: `1px solid ${pipelineFocus === "all" ? DS.colors.borderLight : DS.colors.border}`,
+                  background: pipelineFocus === "all" ? DS.colors.bgCard : "transparent",
+                  color: pipelineFocus === "all" ? DS.colors.text : DS.colors.textMuted,
+                  cursor: "pointer",
+                  fontSize: "12px",
+                }}
+              >
+                All practices ({practices.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPipelineFocus("capture")}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: DS.radius.sm,
+                  border: `1px solid ${pipelineFocus === "capture" ? DS.colors.shock : DS.colors.border}`,
+                  background: pipelineFocus === "capture" ? DS.colors.shockGlow : "transparent",
+                  color: pipelineFocus === "capture" ? DS.colors.shock : DS.colors.textMuted,
+                  cursor: "pointer",
+                  fontSize: "12px",
+                }}
+              >
+                Capture-signal only ({practicesWithCaptureSignals})
+              </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px" }}>
+              {STAGES.map((stage) => (
+                <div key={stage.key}>
+                  <div style={{
+                    fontSize: "11px", color: stage.color, textTransform: "uppercase",
+                    letterSpacing: "0.08em", fontWeight: 600, marginBottom: "10px",
+                    display: "flex", alignItems: "center", gap: "6px",
+                  }}>
+                    <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: stage.color }} />
+                    {stage.label}
+                    <span style={{ color: DS.colors.textDim, fontWeight: 400 }}>
+                      ({pipelinePractices.filter((c) => c.stage === stage.key).length})
+                    </span>
+                  </div>
+                  <div style={{ display: "grid", gap: "8px" }}>
+                    {pipelinePractices.filter((c) => c.stage === stage.key).map((c) => (
+                      <div key={c.id} onClick={() => setSelectedClient(c)} style={{
+                        padding: "14px 16px", background: DS.colors.bgCard,
+                        border: `1px solid ${DS.colors.border}`, borderRadius: DS.radius.md,
+                        cursor: "pointer", transition: "border-color 0.2s",
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.borderColor = DS.colors.borderLight}
+                      onMouseOut={(e) => e.currentTarget.style.borderColor = DS.colors.border}
+                      >
+                        {/* Lead Score Badge for leads */}
+                        {c.stage === "lead" && c.lead_score && (
+                          <div style={{ marginBottom: "8px" }}>
+                            <LeadScoreBadge score={c.lead_score} size="small" />
                           </div>
-                          <span style={{ fontFamily: DS.fonts.mono, fontSize: "11px", color: DS.colors.textMuted }}>{c.score}</span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        )}
+                        <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "4px" }}>{c.name}</div>
+                        <div style={{ fontSize: "11px", color: DS.colors.textMuted }}>{c.providers} providers · {c.specialty}</div>
+                        <div style={{ fontSize: "11px", color: DS.colors.textDim, marginTop: "2px" }}>{c.ehr}</div>
+                        {c.score && (
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "8px" }}>
+                            <div style={{
+                              width: "60px", height: "4px", background: DS.colors.border, borderRadius: "2px", overflow: "hidden",
+                            }}>
+                              <div style={{
+                                width: `${c.score}%`, height: "100%", borderRadius: "2px",
+                                background: c.score >= 80 ? DS.colors.vital : c.score >= 60 ? DS.colors.warn : DS.colors.danger,
+                              }} />
+                            </div>
+                            <span style={{ fontFamily: DS.fonts.mono, fontSize: "11px", color: DS.colors.textMuted }}>{c.score}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
           )
         )}

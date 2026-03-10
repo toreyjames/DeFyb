@@ -6776,6 +6776,7 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [includeImplementation, setIncludeImplementation] = useState(false);
   const [providerCount, setProviderCount] = useState(1);
   const [activeProviders, setActiveProviders] = useState(1);
+  const [reviewDrafts, setReviewDrafts] = useState({});
 
   const copyText = async (label, text) => {
     if (!text) return;
@@ -6795,7 +6796,7 @@ const RevenueCaptureTool = ({ onBack }) => {
 
       const { data, error: historyError } = await supabase
         .from("encounter_analyses")
-        .select("id, specialty, billed_code, suggested_code, confidence, estimated_delta_per_visit, note_snippet, created_at, rationale, gaps, suggestions, estimated_monthly_recovery")
+        .select("id, specialty, billed_code, suggested_code, confidence, estimated_delta_per_visit, note_snippet, created_at, rationale, gaps, suggestions, estimated_monthly_recovery, review_status, reviewer_code, reviewer_notes")
         .order("created_at", { ascending: false })
         .limit(20);
 
@@ -6814,6 +6815,9 @@ const RevenueCaptureTool = ({ onBack }) => {
         gaps: row.gaps || [],
         suggestions: row.suggestions || [],
         estimatedMonthlyRecovery: Number(row.estimated_monthly_recovery || 0),
+        reviewStatus: row.review_status || "pending",
+        reviewerCode: row.reviewer_code || "",
+        reviewerNotes: row.reviewer_notes || "",
       }));
 
       setHistory(mapped);
@@ -6940,6 +6944,9 @@ const RevenueCaptureTool = ({ onBack }) => {
         gaps: row.gaps || [],
         suggestions: row.suggestions || [],
         estimatedMonthlyRecovery: Number(row.estimated_monthly_recovery || 0),
+        reviewStatus: row.review_status || "pending",
+        reviewerCode: row.reviewer_code || "",
+        reviewerNotes: row.reviewer_notes || "",
       };
 
       setAnalysis({
@@ -6979,6 +6986,51 @@ const RevenueCaptureTool = ({ onBack }) => {
   const additionalProviders = Math.max(0, providerCount - 1);
   const monthlyEstimate = 299 + (additionalProviders * 199);
   const overLimit = activeProviders > providerCount;
+  const reviewedCases = history.filter((h) => h.reviewStatus && h.reviewStatus !== "pending");
+  const agreeCases = reviewedCases.filter((h) => h.reviewStatus === "agree");
+  const agreementRate = reviewedCases.length > 0 ? Math.round((agreeCases.length / reviewedCases.length) * 100) : 0;
+
+  const setReviewField = (analysisId, field, value) => {
+    setReviewDrafts((prev) => ({
+      ...prev,
+      [analysisId]: {
+        ...prev[analysisId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const saveReview = async (item) => {
+    if (!isSupabaseConfigured()) return;
+    const draft = reviewDrafts[item.id] || {};
+    const reviewStatus = draft.reviewStatus || item.reviewStatus || "pending";
+    const reviewerCode = draft.reviewerCode ?? item.reviewerCode ?? "";
+    const reviewerNotes = draft.reviewerNotes ?? item.reviewerNotes ?? "";
+
+    const payload = {
+      review_status: reviewStatus,
+      reviewer_code: reviewerCode || null,
+      reviewer_notes: reviewerNotes || null,
+      reviewed_at: new Date().toISOString(),
+    };
+
+    const { error: updateError } = await supabase
+      .from("encounter_analyses")
+      .update(payload)
+      .eq("id", item.id);
+
+    if (updateError) {
+      setError(updateError.message || "Could not save review.");
+      return;
+    }
+
+    setHistory((prev) => prev.map((h) => (
+      h.id === item.id
+        ? { ...h, reviewStatus, reviewerCode, reviewerNotes }
+        : h
+    )));
+    setReviewDrafts((prev) => ({ ...prev, [item.id]: {} }));
+  };
 
   return (
     <div style={{ minHeight: "100vh" }}>
@@ -7181,6 +7233,16 @@ const RevenueCaptureTool = ({ onBack }) => {
 
         {analysis && (
           <div style={{ marginTop: "14px", display: "grid", gap: "14px" }}>
+            <Card>
+              <div style={{ fontWeight: 600, marginBottom: "10px" }}>Validation Metrics</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px" }}>
+                <MetricCard small label="Analyses Run" value={history.length.toString()} color={DS.colors.blue} />
+                <MetricCard small label="Cases Reviewed" value={reviewedCases.length.toString()} color={DS.colors.textMuted} />
+                <MetricCard small label="Agreement Rate" value={`${agreementRate}%`} color={agreementRate >= 80 ? DS.colors.vital : DS.colors.warn} />
+                <MetricCard small label="Manual Review Pending" value={(history.length - reviewedCases.length).toString()} color={DS.colors.warn} />
+              </div>
+            </Card>
+
             {lowConfidence && (
               <Card style={{ borderColor: DS.colors.warn, background: `${DS.colors.warn}11` }}>
                 <div style={{ fontWeight: 600, color: DS.colors.warn, marginBottom: "6px" }}>
@@ -7267,20 +7329,94 @@ const RevenueCaptureTool = ({ onBack }) => {
                       display: "grid",
                       gridTemplateColumns: "140px 1fr auto",
                       gap: "10px",
-                      alignItems: "center",
+                      alignItems: "start",
                       padding: "8px 10px",
                       borderRadius: DS.radius.sm,
                       background: DS.colors.bg,
                       border: `1px solid ${DS.colors.border}`,
                     }}>
                       <div style={{ fontSize: "11px", color: DS.colors.textDim }}>{h.at}</div>
-                      <div style={{ fontSize: "12px", color: DS.colors.textMuted }}>
-                        [{h.specialty}]{" "}
-                        {h.billedCode} {"->"} {h.suggestedCode} ({Math.round(h.confidence * 100)}%) ·
-                        {h.noteSnippet ? ` ${h.noteSnippet}` : " No note snippet"}
+                      <div>
+                        <div style={{ fontSize: "12px", color: DS.colors.textMuted }}>
+                          [{h.specialty}]{" "}
+                          {h.billedCode} {"->"} {h.suggestedCode} ({Math.round(h.confidence * 100)}%)
+                        </div>
+                        <div style={{ marginTop: "8px", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                          <select
+                            value={reviewDrafts[h.id]?.reviewStatus ?? h.reviewStatus ?? "pending"}
+                            onChange={(e) => setReviewField(h.id, "reviewStatus", e.target.value)}
+                            style={{
+                              padding: "6px 8px",
+                              borderRadius: DS.radius.sm,
+                              border: `1px solid ${DS.colors.borderLight}`,
+                              background: DS.colors.bgCard,
+                              color: DS.colors.text,
+                              fontSize: "12px",
+                            }}
+                          >
+                            <option value="pending">Review pending</option>
+                            <option value="agree">Agree with suggestion</option>
+                            <option value="disagree">Disagree</option>
+                          </select>
+                          <select
+                            value={reviewDrafts[h.id]?.reviewerCode ?? h.reviewerCode ?? ""}
+                            onChange={(e) => setReviewField(h.id, "reviewerCode", e.target.value)}
+                            style={{
+                              padding: "6px 8px",
+                              borderRadius: DS.radius.sm,
+                              border: `1px solid ${DS.colors.borderLight}`,
+                              background: DS.colors.bgCard,
+                              color: DS.colors.text,
+                              fontSize: "12px",
+                            }}
+                          >
+                            <option value="">Reviewer final code</option>
+                            <option value="99213">99213</option>
+                            <option value="99214">99214</option>
+                            <option value="99215">99215</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => saveReview(h)}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: DS.radius.sm,
+                              border: `1px solid ${DS.colors.borderLight}`,
+                              background: DS.colors.bgCard,
+                              color: DS.colors.text,
+                              cursor: "pointer",
+                              fontSize: "12px",
+                            }}
+                          >
+                            Save review
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={reviewDrafts[h.id]?.reviewerNotes ?? h.reviewerNotes ?? ""}
+                          onChange={(e) => setReviewField(h.id, "reviewerNotes", e.target.value)}
+                          placeholder="Reviewer notes (optional)"
+                          style={{
+                            width: "100%",
+                            marginTop: "8px",
+                            padding: "6px 8px",
+                            borderRadius: DS.radius.sm,
+                            border: `1px solid ${DS.colors.borderLight}`,
+                            background: DS.colors.bgCard,
+                            color: DS.colors.text,
+                            fontSize: "12px",
+                          }}
+                        />
                       </div>
                       <div style={{ fontSize: "12px", color: DS.colors.vital, fontWeight: 500 }}>
                         +${h.estimatedDeltaPerVisit}/visit
+                        <div style={{
+                          marginTop: "6px",
+                          fontSize: "11px",
+                          color: h.reviewStatus === "agree" ? DS.colors.vital : h.reviewStatus === "disagree" ? DS.colors.warn : DS.colors.textDim,
+                        }}>
+                          {h.reviewStatus === "agree" ? "Reviewed: agree" : h.reviewStatus === "disagree" ? "Reviewed: disagree" : "Not reviewed"}
+                        </div>
                       </div>
                     </div>
                   ))}

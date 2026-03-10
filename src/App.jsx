@@ -3868,6 +3868,44 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
     }
   };
 
+  // Minimal front page: short message + direct login CTA.
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <nav style={{
+        position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "12px clamp(16px, 4vw, 80px)",
+        background: `${DS.colors.bg}ee`, backdropFilter: "blur(12px)",
+        borderBottom: `1px solid ${DS.colors.border}`,
+      }}>
+        <div onClick={handleLogoClick} style={{ cursor: "pointer" }}>
+          <DeFybLogo size={28} />
+        </div>
+        <Button primary small onClick={onClientLogin}>Login</Button>
+      </nav>
+
+      <div style={{
+        flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "120px 24px 40px",
+      }}>
+        <div style={{ width: "100%", maxWidth: "760px", textAlign: "center" }}>
+          <h1 style={{
+            fontFamily: DS.fonts.display, fontSize: "clamp(34px, 6vw, 64px)",
+            lineHeight: 1.1, marginBottom: "18px",
+          }}>
+            Defying the death of small practices.
+          </h1>
+          <p style={{ fontSize: "18px", color: DS.colors.textMuted, marginBottom: "28px" }}>
+            DeFyb finds underbilling in your encounter documentation and shows what to fix so doctors save time and get paid correctly.
+          </p>
+          <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
+            <Button primary onClick={onClientLogin}>Login to Start the Tool →</Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const baselineNumbers = (() => {
     const providerCount = Math.max(1, parseInt(baseline.providers || "0", 10) || 0);
     const visitsPerDay = Math.max(1, parseInt(baseline.visitsPerProviderPerDay || "0", 10) || 0);

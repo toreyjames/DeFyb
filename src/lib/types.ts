@@ -44,3 +44,13 @@ export type AnalysisResult = {
   revenueImpact: RevenueImpact;
   finalizedNote: string;
 };
+
+export type AgenticAction = {
+  id: string;
+  title: string;
+  owner: "provider" | "billing" | "ops-agent";
+  priority: "high" | "medium" | "low";
+  expectedRecovery: number;
+  status: "queued" | "in_progress" | "ready_to_send";
+  reason: string;
+};

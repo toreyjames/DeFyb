@@ -11,6 +11,7 @@ DeFyb is not a generic AI scribe. It is a revenue intelligence system that conve
 3. Billing recommendation with rationale
 4. Documentation gap detection
 5. Revenue impact projection
+6. Agentic revenue-capture action queue for provider + billing + ops workflows
 
 ## MVP Scope
 

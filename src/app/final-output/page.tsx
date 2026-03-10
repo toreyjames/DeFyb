@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { loadAnalysis } from "@/lib/session";
 import { AnalysisResult } from "@/lib/types";
+import { buildAgenticActions } from "@/lib/agenticActions";
 
 const copy = async (value: string) => {
   await navigator.clipboard.writeText(value);
@@ -32,12 +33,19 @@ export default function FinalOutputPage() {
     ].join("\n");
   }, [analysis]);
 
+  const actionSummary = useMemo(() => {
+    if (!analysis) return "";
+    return buildAgenticActions(analysis)
+      .map((action) => `- ${action.title} (${action.status}, ${action.owner})`)
+      .join("\n");
+  }, [analysis]);
+
   if (!analysis) return null;
 
   return (
     <>
       <h1>Final Output</h1>
-      <p className="subtitle">Doctor-approved note and billing package ready for submission.</p>
+      <p className="subtitle">Doctor-approved output with agentic revenue-capture actions ready for operations.</p>
 
       <section className="card">
         <h2>Final Clinical Note</h2>
@@ -47,6 +55,11 @@ export default function FinalOutputPage() {
       <section className="card">
         <h2>Billing Summary</h2>
         <div className="code-box">{billingSummary}</div>
+      </section>
+
+      <section className="card">
+        <h2>Agent Queue Snapshot</h2>
+        <div className="code-box">{actionSummary}</div>
       </section>
 
       <div className="toolbar">

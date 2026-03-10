@@ -21,6 +21,15 @@ npm install
 npm run dev
 ```
 
+## MVP Login
+
+Set credentials for the login gate:
+
+```bash
+MVP_LOGIN_EMAIL=admin@defyb.org
+MVP_LOGIN_PASSWORD=change-me
+```
+
 ## Build
 
 ```bash

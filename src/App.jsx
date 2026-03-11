@@ -8602,10 +8602,7 @@ export default function App() {
 
   const resolveIntentToView = (intent) => {
     if (intent === "team") return teamUser ? "team" : "team-login";
-    if (intent === "tool") {
-      if (teamUser) return "team";
-      return practiceUser ? "tool" : "practice-login";
-    }
+    if (intent === "tool") return practiceUser ? "tool" : "practice-login";
     return "public";
   };
 
@@ -8628,6 +8625,8 @@ export default function App() {
             setTeamUser(session.user);
             if (intent === "team") {
               setCurrentView("team");
+            } else if (intent === "tool") {
+              setCurrentView("practice-login");
             }
           } else {
             setPracticeUser(session.user);
@@ -8761,8 +8760,6 @@ export default function App() {
   const handleRequestPracticeAccess = () => {
     if (practiceUser) {
       setCurrentView("tool");
-    } else if (teamUser) {
-      setCurrentView("team");
     } else {
       setCurrentView("practice-login");
     }

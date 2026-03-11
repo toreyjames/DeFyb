@@ -6559,11 +6559,9 @@ const normalizeAuthError = (err, mode = "generic") => {
 const PracticeLogin = ({ onLogin, onBack }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [usePassword] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
-  const [linkSent, setLinkSent] = useState(false);
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
@@ -6583,32 +6581,6 @@ const PracticeLogin = ({ onLogin, onBack }) => {
       if (data.user) onLogin(data.user);
     } catch (err) {
       setError(normalizeAuthError(err, "password"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleMagicLink = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setNotice(null);
-
-    if (!isSupabaseConfigured()) {
-      setError("Authentication not configured");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const { error: authError } = await supabase.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: window.location.origin + "?tool=1" },
-      });
-      if (authError) throw authError;
-      setLinkSent(true);
-    } catch (err) {
-      setError(normalizeAuthError(err, "magic"));
     } finally {
       setLoading(false);
     }
@@ -6666,23 +6638,6 @@ const PracticeLogin = ({ onLogin, onBack }) => {
       setLoading(false);
     }
   };
-
-  if (linkSent) {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Card style={{ width: "100%", maxWidth: "380px", margin: "20px", textAlign: "center" }}>
-          <div style={{ fontSize: "48px", marginBottom: "16px" }}>📧</div>
-          <h2 style={{ fontFamily: DS.fonts.display, fontSize: "24px", marginBottom: "8px" }}>Check your email</h2>
-          <p style={{ color: DS.colors.textMuted, fontSize: "14px", marginBottom: "24px" }}>
-            Magic link sent to <strong style={{ color: DS.colors.text }}>{email}</strong>.
-          </p>
-          <span onClick={() => { setLinkSent(false); setEmail(""); }} style={{ fontSize: "13px", color: DS.colors.shock, cursor: "pointer" }}>
-            Use a different email
-          </span>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -8198,11 +8153,9 @@ const RevenueCaptureTool = ({ onBack }) => {
 const TeamLogin = ({ onLogin, onBack }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [usePassword] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
-  const [linkSent, setLinkSent] = useState(false);
 
   const allowedDomains = (import.meta.env.VITE_ALLOWED_TEAM_DOMAINS || "defyb.org")
     .split(",")
@@ -8219,16 +8172,6 @@ const TeamLogin = ({ onLogin, onBack }) => {
     const domain = normalized.split("@")[1];
     if (allowedEmails.includes(normalized)) return true;
     return allowedDomains.includes(domain);
-  };
-
-  // Common email typos to catch
-  const validateEmail = (email) => {
-    const typos = ["gmaill.com", "gmial.com", "gamil.com", "gnail.com", "gmail.co", "gmal.com"];
-    const domain = email.split("@")[1]?.toLowerCase();
-    if (typos.includes(domain)) {
-      return `Did you mean "${email.replace(domain, "gmail.com")}"?`;
-    }
-    return null;
   };
 
   const handlePasswordLogin = async (e) => {
@@ -8261,58 +8204,6 @@ const TeamLogin = ({ onLogin, onBack }) => {
       }
     } catch (err) {
       setError(normalizeAuthError(err, "password"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleMagicLink = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setNotice(null);
-
-    // Check for email typos
-    const typoWarning = validateEmail(email);
-    if (typoWarning) {
-      setError(typoWarning);
-      setLoading(false);
-      return;
-    }
-
-    if (!isSupabaseConfigured()) {
-      setError("Authentication not configured");
-      setLoading(false);
-      return;
-    }
-
-    if (!isAllowedWorkEmail(email)) {
-      setError("Use your approved clinic/work email address.");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const { error: authError } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: window.location.origin + "?team=1",
-        },
-      });
-
-      if (authError) {
-        // Handle rate limiting specifically
-        if (authError.message?.includes("rate") || authError.message?.includes("limit")) {
-          setError(normalizeAuthError(authError, "magic"));
-          setUsePassword(true);
-        } else {
-          throw authError;
-        }
-        return;
-      }
-      setLinkSent(true);
-    } catch (err) {
-      setError(normalizeAuthError(err, "magic"));
     } finally {
       setLoading(false);
     }
@@ -8374,29 +8265,6 @@ const TeamLogin = ({ onLogin, onBack }) => {
       setLoading(false);
     }
   };
-
-  if (linkSent) {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Card style={{ width: "100%", maxWidth: "380px", margin: "20px", textAlign: "center" }}>
-          <div style={{ fontSize: "48px", marginBottom: "16px" }}>📧</div>
-          <h2 style={{ fontFamily: DS.fonts.display, fontSize: "24px", marginBottom: "8px" }}>
-            Check your email
-          </h2>
-          <p style={{ color: DS.colors.textMuted, fontSize: "14px", marginBottom: "24px" }}>
-            We sent a magic link to <strong style={{ color: DS.colors.text }}>{email}</strong>.
-            Click the link to sign in.
-          </p>
-          <span
-            onClick={() => { setLinkSent(false); setEmail(""); }}
-            style={{ fontSize: "13px", color: DS.colors.shock, cursor: "pointer" }}
-          >
-            Use a different email
-          </span>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>

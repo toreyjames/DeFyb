@@ -6791,6 +6791,8 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [queueStopRequested, setQueueStopRequested] = useState(false);
   const queueStopRef = useRef(false);
   const [activeEncounterId, setActiveEncounterId] = useState(null);
+  const [encounterDetail, setEncounterDetail] = useState(null);
+  const [encounterDetailLoading, setEncounterDetailLoading] = useState(false);
 
   const copyText = async (label, text) => {
     if (!text) return;
@@ -7224,6 +7226,19 @@ const RevenueCaptureTool = ({ onBack }) => {
     if (!analyzingQueue) return;
     queueStopRef.current = true;
     setQueueStopRequested(true);
+  };
+
+  const loadEncounterDetail = async (encounterId) => {
+    if (!encounterId) return;
+    try {
+      setEncounterDetailLoading(true);
+      const detail = await invokeEncountersApi(`/encounters/${encounterId}`, "GET");
+      setEncounterDetail(detail);
+    } catch (detailError) {
+      setError(detailError.message || "Could not load encounter detail.");
+    } finally {
+      setEncounterDetailLoading(false);
+    }
   };
 
   const analyzeAllQueue = async () => {
@@ -7997,6 +8012,23 @@ const RevenueCaptureTool = ({ onBack }) => {
                           >
                             Save review
                           </button>
+                          {h.encounterId && (
+                            <button
+                              type="button"
+                              onClick={() => loadEncounterDetail(h.encounterId)}
+                              style={{
+                                padding: "6px 10px",
+                                borderRadius: DS.radius.sm,
+                                border: `1px solid ${DS.colors.blue}`,
+                                background: DS.colors.blueDim,
+                                color: DS.colors.blue,
+                                cursor: "pointer",
+                                fontSize: "12px",
+                              }}
+                            >
+                              View Encounter Detail
+                            </button>
+                          )}
                         </div>
                         <input
                           type="text"
@@ -8035,6 +8067,101 @@ const RevenueCaptureTool = ({ onBack }) => {
                 </div>
               )}
             </Card>
+
+            {(encounterDetailLoading || encounterDetail) && (
+              <Card>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                  <div style={{ fontWeight: 600 }}>Encounter Detail</div>
+                  {encounterDetail && (
+                    <button
+                      type="button"
+                      onClick={() => setEncounterDetail(null)}
+                      style={{
+                        padding: "4px 8px",
+                        borderRadius: DS.radius.sm,
+                        border: `1px solid ${DS.colors.borderLight}`,
+                        background: "transparent",
+                        color: DS.colors.textMuted,
+                        cursor: "pointer",
+                        fontSize: "12px",
+                      }}
+                    >
+                      Close
+                    </button>
+                  )}
+                </div>
+
+                {encounterDetailLoading && (
+                  <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>Loading encounter detail...</div>
+                )}
+
+                {!encounterDetailLoading && encounterDetail && (
+                  <div style={{ display: "grid", gap: "12px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "8px" }}>
+                      <div style={{ fontSize: "12px", color: DS.colors.textMuted }}>
+                        Encounter ID
+                        <div style={{ color: DS.colors.text, fontFamily: DS.fonts.mono, marginTop: "2px" }}>{encounterDetail.encounter?.id || "-"}</div>
+                      </div>
+                      <div style={{ fontSize: "12px", color: DS.colors.textMuted }}>
+                        Date
+                        <div style={{ color: DS.colors.text, marginTop: "2px" }}>{encounterDetail.encounter?.encounter_date || "-"}</div>
+                      </div>
+                      <div style={{ fontSize: "12px", color: DS.colors.textMuted }}>
+                        Status
+                        <div style={{ color: DS.colors.text, marginTop: "2px" }}>{encounterDetail.encounter?.status || "-"}</div>
+                      </div>
+                      <div style={{ fontSize: "12px", color: DS.colors.textMuted }}>
+                        POS
+                        <div style={{ color: DS.colors.text, marginTop: "2px" }}>{encounterDetail.encounter?.pos || "-"}</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "6px" }}>Latest Revenue Impact</div>
+                      {encounterDetail.latest_revenue_impact ? (
+                        <div style={{ fontSize: "12px", color: DS.colors.textMuted }}>
+                          {encounterDetail.latest_revenue_impact.current_code || "-"} → {encounterDetail.latest_revenue_impact.suggested_code || "-"} ·
+                          Delta ${Number(encounterDetail.latest_revenue_impact.delta_amount || 0).toFixed(2)} ·
+                          Source {encounterDetail.latest_revenue_impact.rate_source || "unknown"}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: "12px", color: DS.colors.textDim }}>No revenue impact record yet.</div>
+                      )}
+                    </div>
+
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "6px" }}>Recommendation History</div>
+                      {(encounterDetail.recommendation_history || []).length === 0 ? (
+                        <div style={{ fontSize: "12px", color: DS.colors.textDim }}>No recommendations recorded.</div>
+                      ) : (
+                        <div style={{ display: "grid", gap: "6px" }}>
+                          {(encounterDetail.recommendation_history || []).slice(0, 5).map((rec) => (
+                            <div key={rec.id} style={{ fontSize: "12px", color: DS.colors.textMuted }}>
+                              [{rec.rule_version}] {rec.suggested_code} · status: {rec.status} · selected: {rec.current_user_selected_code || "-"}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "6px" }}>Audit Trail</div>
+                      {(encounterDetail.audit_events || []).length === 0 ? (
+                        <div style={{ fontSize: "12px", color: DS.colors.textDim }}>No audit events yet.</div>
+                      ) : (
+                        <div style={{ display: "grid", gap: "6px" }}>
+                          {(encounterDetail.audit_events || []).slice(0, 8).map((ev, idx) => (
+                            <div key={`${ev.created_at}-${idx}`} style={{ fontSize: "12px", color: DS.colors.textMuted }}>
+                              {new Date(ev.created_at).toLocaleString()} · {ev.event_type}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            )}
           </div>
         )}
       </div>

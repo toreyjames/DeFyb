@@ -6559,7 +6559,7 @@ const normalizeAuthError = (err, mode = "generic") => {
 const PracticeLogin = ({ onLogin, onBack }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [usePassword, setUsePassword] = useState(false);
+  const [usePassword] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -6710,7 +6710,7 @@ const PracticeLogin = ({ onLogin, onBack }) => {
           or sign in with email
         </div>
 
-        <form onSubmit={usePassword ? handlePasswordLogin : handleMagicLink}>
+        <form onSubmit={handlePasswordLogin}>
           <div style={{ marginBottom: "16px" }}>
             <label style={{ display: "block", fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
               Clinic Email
@@ -6729,25 +6729,23 @@ const PracticeLogin = ({ onLogin, onBack }) => {
             />
           </div>
 
-          {usePassword && (
-            <div style={{ marginBottom: "16px" }}>
-              <label style={{ display: "block", fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
-                required
-                style={{
-                  width: "100%", padding: "10px 12px", background: DS.colors.bg,
-                  border: `1px solid ${DS.colors.borderLight}`, borderRadius: DS.radius.sm,
-                  color: DS.colors.text, fontSize: "14px", outline: "none",
-                }}
-              />
-            </div>
-          )}
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ display: "block", fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password"
+              required
+              style={{
+                width: "100%", padding: "10px 12px", background: DS.colors.bg,
+                border: `1px solid ${DS.colors.borderLight}`, borderRadius: DS.radius.sm,
+                color: DS.colors.text, fontSize: "14px", outline: "none",
+              }}
+            />
+          </div>
 
           {error && (
             <div style={{
@@ -6774,22 +6772,12 @@ const PracticeLogin = ({ onLogin, onBack }) => {
             fontSize: "15px", fontWeight: 500, letterSpacing: "0.01em",
             opacity: loading ? 0.7 : 1, transition: "all 0.2s ease",
           }}>
-            {loading ? (usePassword ? "Signing in..." : "Sending...") : (usePassword ? "Sign In" : "Send Magic Link")}
+            {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
 
         <p style={{ textAlign: "center", marginTop: "16px", fontSize: "12px", color: DS.colors.textDim }}>
-          {usePassword ? (
-            <>
-              <span onClick={() => setUsePassword(false)} style={{ color: DS.colors.shock, cursor: "pointer" }}>Switch to magic link</span>
-              {" • "}
-              <span onClick={() => !loading && handlePasswordReset()} style={{ color: DS.colors.shock, cursor: "pointer" }}>Forgot password</span>
-            </>
-          ) : (
-            <>
-              No password needed or <span onClick={() => setUsePassword(true)} style={{ color: DS.colors.shock, cursor: "pointer" }}>use password</span>
-            </>
-          )}
+          <span onClick={() => !loading && handlePasswordReset()} style={{ color: DS.colors.shock, cursor: "pointer" }}>Forgot password</span>
         </p>
 
         <div style={{ textAlign: "center", marginTop: "20px" }}>
@@ -8210,7 +8198,7 @@ const RevenueCaptureTool = ({ onBack }) => {
 const TeamLogin = ({ onLogin, onBack }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [usePassword, setUsePassword] = useState(false);
+  const [usePassword] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -8439,7 +8427,7 @@ const TeamLogin = ({ onLogin, onBack }) => {
           or sign in with work email
         </div>
 
-        <form onSubmit={usePassword ? handlePasswordLogin : handleMagicLink}>
+        <form onSubmit={handlePasswordLogin}>
           <div style={{ marginBottom: "16px" }}>
             <label style={{
               display: "block", fontSize: "12px", color: DS.colors.textMuted,
@@ -8461,28 +8449,26 @@ const TeamLogin = ({ onLogin, onBack }) => {
             />
           </div>
 
-          {usePassword && (
-            <div style={{ marginBottom: "16px" }}>
-              <label style={{
-                display: "block", fontSize: "12px", color: DS.colors.textMuted,
-                marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em"
-              }}>
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
-                required
-                style={{
-                  width: "100%", padding: "10px 12px", background: DS.colors.bg,
-                  border: `1px solid ${DS.colors.borderLight}`, borderRadius: DS.radius.sm,
-                  color: DS.colors.text, fontSize: "14px", outline: "none",
-                }}
-              />
-            </div>
-          )}
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{
+              display: "block", fontSize: "12px", color: DS.colors.textMuted,
+              marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em"
+            }}>
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password"
+              required
+              style={{
+                width: "100%", padding: "10px 12px", background: DS.colors.bg,
+                border: `1px solid ${DS.colors.borderLight}`, borderRadius: DS.radius.sm,
+                color: DS.colors.text, fontSize: "14px", outline: "none",
+              }}
+            />
+          </div>
 
           {error && (
             <div style={{
@@ -8509,29 +8495,14 @@ const TeamLogin = ({ onLogin, onBack }) => {
             fontSize: "15px", fontWeight: 500, letterSpacing: "0.01em",
             opacity: loading ? 0.7 : 1, transition: "all 0.2s ease",
           }}>
-            {loading ? (usePassword ? "Signing in..." : "Sending...") : (usePassword ? "Sign In" : "Send Magic Link")}
+            {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
 
         <p style={{ textAlign: "center", marginTop: "16px", fontSize: "12px", color: DS.colors.textDim }}>
-          {usePassword ? (
-            <>
-              <span onClick={() => setUsePassword(false)} style={{ color: DS.colors.shock, cursor: "pointer" }}>
-                Switch to magic link
-              </span>
-              {" • "}
-              <span onClick={() => !loading && handlePasswordReset()} style={{ color: DS.colors.shock, cursor: "pointer" }}>
-                Forgot password
-              </span>
-            </>
-          ) : (
-            <>
-              No password needed — or{" "}
-              <span onClick={() => setUsePassword(true)} style={{ color: DS.colors.shock, cursor: "pointer" }}>
-                use password
-              </span>
-            </>
-          )}
+          <span onClick={() => !loading && handlePasswordReset()} style={{ color: DS.colors.shock, cursor: "pointer" }}>
+            Forgot password
+          </span>
         </p>
 
         <div style={{ textAlign: "center", marginTop: "20px" }}>

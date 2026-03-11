@@ -7066,6 +7066,33 @@ const RevenueCaptureTool = ({ onBack }) => {
   const activeModelVersion = history[0]?.modelVersion || analysis?.modelVersion || "rules-v1.3-context";
   const queuePendingCount = queueItems.filter((item) => item.status === "pending").length;
   const queueDoneCount = queueItems.filter((item) => item.status === "done").length;
+  const qualityGate = (() => {
+    if (!analysis) return { hardStops: [], warnings: [], canFinalize: false };
+
+    const hardStops = [];
+    const warnings = [];
+    const gaps = analysis.gaps || [];
+    const hasGap = (pattern) => gaps.some((g) => pattern.test((g || "").toLowerCase()));
+
+    if (analysis.confidence < 0.7) {
+      hardStops.push("Confidence is below 70%. Manual clinical/coding review required.");
+    }
+    if (codingPath === "time" && (!totalMinutes || Number(totalMinutes) < 20)) {
+      hardStops.push("Time-based coding selected but total documented minutes are below threshold.");
+    }
+    if (analysis.suggestedCode !== billedCode && hasGap(/risk\/benefit discussion missing|data review not clearly documented/)) {
+      hardStops.push("Suggested code increase has unresolved required documentation gaps.");
+    }
+
+    if (placeOfService === "telehealth" && !isTelehealth) {
+      warnings.push("POS is telehealth but telehealth toggle is off.");
+    }
+    if (patientType === "new") {
+      warnings.push("New-patient workflows may need broader E/M range validation.");
+    }
+
+    return { hardStops, warnings, canFinalize: hardStops.length === 0 };
+  })();
 
   const loadQueue = () => {
     const parsed = queueInput
@@ -7139,6 +7166,10 @@ const RevenueCaptureTool = ({ onBack }) => {
 
   const handleFinalizeEncounter = async () => {
     if (!analysis) return;
+    if (!qualityGate.canFinalize) {
+      setError("Finalize blocked by compliance gate. Resolve hard-stop items first.");
+      return;
+    }
     const packet = [
       `Finalized code: ${analysis.suggestedCode}`,
       `Original billed code: ${billedCode}`,
@@ -7566,6 +7597,9 @@ const RevenueCaptureTool = ({ onBack }) => {
                 <MetricCard small label="Agreement Rate" value={`${agreementRate}%`} color={agreementRate >= 80 ? DS.colors.vital : DS.colors.warn} />
                 <MetricCard small label="Manual Review Pending" value={(history.length - reviewedCases.length).toString()} color={DS.colors.warn} />
               </div>
+              <div style={{ marginTop: "10px", fontSize: "12px", color: qualityGate.canFinalize ? DS.colors.vital : DS.colors.warn }}>
+                Finalize gate: {qualityGate.canFinalize ? "Clear" : `Blocked (${qualityGate.hardStops.length} hard-stop)`}
+              </div>
               <div style={{ marginTop: "10px", fontSize: "12px", color: DS.colors.textMuted }}>
                 Active model version: <span style={{ color: DS.colors.text, fontFamily: DS.fonts.mono }}>{activeModelVersion}</span>
               </div>
@@ -7639,10 +7673,50 @@ const RevenueCaptureTool = ({ onBack }) => {
                   <Button small onClick={() => copyText("Copied billing summary", billingSummary)}>
                     Copy Billing Summary
                   </Button>
-                  <Button small onClick={handleFinalizeEncounter} style={{ background: DS.colors.vital, border: "none" }}>
+                  <Button
+                    small
+                    onClick={handleFinalizeEncounter}
+                    style={{
+                      background: qualityGate.canFinalize ? DS.colors.vital : DS.colors.warn,
+                      border: "none",
+                      opacity: qualityGate.canFinalize ? 1 : 0.8,
+                    }}
+                  >
                     Finalize + Copy Packet
                   </Button>
                 </div>
+                {qualityGate.hardStops.length > 0 && (
+                  <div style={{
+                    marginTop: "8px",
+                    padding: "8px 10px",
+                    borderRadius: DS.radius.sm,
+                    background: DS.colors.warnDim,
+                    color: DS.colors.warn,
+                    fontSize: "12px",
+                    display: "grid",
+                    gap: "4px",
+                  }}>
+                    {qualityGate.hardStops.map((item, idx) => (
+                      <div key={idx}>• {item}</div>
+                    ))}
+                  </div>
+                )}
+                {qualityGate.warnings.length > 0 && (
+                  <div style={{
+                    marginTop: "8px",
+                    padding: "8px 10px",
+                    borderRadius: DS.radius.sm,
+                    background: DS.colors.blueDim,
+                    color: DS.colors.textMuted,
+                    fontSize: "12px",
+                    display: "grid",
+                    gap: "4px",
+                  }}>
+                    {qualityGate.warnings.map((item, idx) => (
+                      <div key={idx}>• {item}</div>
+                    ))}
+                  </div>
+                )}
                 {analysis.id && history.find((h) => h.id === analysis.id)?.acceptedAt && (
                   <div style={{ marginTop: "8px", fontSize: "12px", color: DS.colors.vital }}>
                     Finalized at {new Date(history.find((h) => h.id === analysis.id).acceptedAt).toLocaleString()}

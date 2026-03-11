@@ -6771,6 +6771,7 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [codingPath, setCodingPath] = useState("mdm");
   const [totalMinutes, setTotalMinutes] = useState("");
   const [isTelehealth, setIsTelehealth] = useState(false);
+  const [encounterDate, setEncounterDate] = useState(new Date().toISOString().slice(0, 10));
   const [analysis, setAnalysis] = useState(null);
   const [history, setHistory] = useState([]);
   const [copied, setCopied] = useState("");
@@ -6946,6 +6947,7 @@ const RevenueCaptureTool = ({ onBack }) => {
         codingPath,
         totalMinutes: codingPath === "time" ? Math.max(0, Number(totalMinutes || 0)) : null,
         telehealth: isTelehealth,
+        encounterDate,
       };
 
       const { data, error: invokeError } = await supabase.functions.invoke("analyze-encounter", {
@@ -7029,6 +7031,7 @@ const RevenueCaptureTool = ({ onBack }) => {
   const billingSummary = analysis ? [
     `Billed code: ${billedCode}`,
     `Suggested code: ${analysis.suggestedCode}`,
+    ...(analysis.suggestedCode === "99024" ? ["Global post-op follow-up: non-billable (90-day window)"] : []),
     `Confidence: ${Math.round(analysis.confidence * 100)}%`,
     "",
     "Justification:",
@@ -7073,14 +7076,15 @@ const RevenueCaptureTool = ({ onBack }) => {
     const warnings = [];
     const gaps = analysis.gaps || [];
     const hasGap = (pattern) => gaps.some((g) => pattern.test((g || "").toLowerCase()));
+    const isGlobalPostOp = analysis.suggestedCode === "99024";
 
-    if (analysis.confidence < 0.7) {
+    if (!isGlobalPostOp && analysis.confidence < 0.7) {
       hardStops.push("Confidence is below 70%. Manual clinical/coding review required.");
     }
-    if (codingPath === "time" && (!totalMinutes || Number(totalMinutes) < 20)) {
+    if (!isGlobalPostOp && codingPath === "time" && (!totalMinutes || Number(totalMinutes) < 20)) {
       hardStops.push("Time-based coding selected but total documented minutes are below threshold.");
     }
-    if (analysis.suggestedCode !== billedCode && hasGap(/risk\/benefit discussion missing|data review not clearly documented/)) {
+    if (!isGlobalPostOp && analysis.suggestedCode !== billedCode && hasGap(/risk\/benefit discussion missing|data review not clearly documented/)) {
       hardStops.push("Suggested code increase has unresolved required documentation gaps.");
     }
 
@@ -7089,6 +7093,9 @@ const RevenueCaptureTool = ({ onBack }) => {
     }
     if (patientType === "new") {
       warnings.push("New-patient workflows may need broader E/M range validation.");
+    }
+    if (isGlobalPostOp) {
+      warnings.push("Global post-op follow-up detected. 99024 is non-billable in the 90-day global period.");
     }
 
     return { hardStops, warnings, canFinalize: hardStops.length === 0 };
@@ -7460,10 +7467,24 @@ const RevenueCaptureTool = ({ onBack }) => {
                     color: DS.colors.text, fontSize: "14px",
                   }}
                 >
+                  <option value="99024">99024</option>
                   <option value="99213">99213</option>
                   <option value="99214">99214</option>
                   <option value="99215">99215</option>
                 </select>
+              </div>
+              <div>
+                <div style={{ fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px" }}>Encounter Date</div>
+                <input
+                  type="date"
+                  value={encounterDate}
+                  onChange={(e) => setEncounterDate(e.target.value)}
+                  style={{
+                    padding: "10px 12px", borderRadius: DS.radius.sm,
+                    border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bg,
+                    color: DS.colors.text, fontSize: "14px",
+                  }}
+                />
               </div>
               <div>
                 <div style={{ fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px" }}>Specialty</div>
@@ -7582,6 +7603,18 @@ const RevenueCaptureTool = ({ onBack }) => {
                 <MetricCard label="Confidence" value={`${Math.round(analysis.confidence * 100)}%`} color={DS.colors.blue} />
                 <MetricCard label="Estimated $ / Visit" value={`$${analysis.estimatedDeltaPerVisit}`} color={DS.colors.vital} />
                 <MetricCard label="Estimated Monthly Recovery" value={`$${analysis.estimatedMonthlyRecovery.toLocaleString()}`} color={DS.colors.vital} />
+                {analysis.suggestedCode === "99024" && (
+                  <div style={{
+                    padding: "8px 10px",
+                    borderRadius: DS.radius.sm,
+                    border: `1px solid ${DS.colors.warn}`,
+                    background: DS.colors.warnDim,
+                    color: DS.colors.warn,
+                    fontSize: "12px",
+                  }}>
+                    Post-op global-period follow-up detected. 99024 is non-billable for visits within 90 days of surgery.
+                  </div>
+                )}
               </div>
             )}
           </Card>

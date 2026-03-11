@@ -6790,6 +6790,7 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [analyzingQueue, setAnalyzingQueue] = useState(false);
   const [queueStopRequested, setQueueStopRequested] = useState(false);
   const queueStopRef = useRef(false);
+  const [activeEncounterId, setActiveEncounterId] = useState(null);
 
   const copyText = async (label, text) => {
     if (!text) return;
@@ -6924,6 +6925,31 @@ const RevenueCaptureTool = ({ onBack }) => {
     }
   };
 
+  const invokeEncountersApi = async (path, method = "GET", body = null) => {
+    if (!isSupabaseConfigured()) throw new Error("Supabase is not configured");
+    const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+    if (!baseUrl) throw new Error("Missing Supabase URL");
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+    if (!accessToken) throw new Error("Missing auth session");
+
+    const response = await fetch(`${baseUrl}/functions/v1/encounters-api${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.error || `encounters-api ${method} ${path} failed`);
+    }
+    return payload;
+  };
+
   const runAnalysis = async (noteOverride = null, queueIdOverride = null, autoAdvance = true, manageLoading = true) => {
     const effectiveNote = typeof noteOverride === "string" ? noteOverride : note;
     const queueTargetId = queueIdOverride || currentQueueId;
@@ -6952,39 +6978,97 @@ const RevenueCaptureTool = ({ onBack }) => {
         surgeryDate: surgeryDate || null,
       };
 
-      const { data, error: invokeError } = await supabase.functions.invoke("analyze-encounter", {
-        body: { note: effectiveNote, billedCode, specialty, context: encounterContext },
-      });
+      let mapped = null;
 
-      if (invokeError) throw invokeError;
+      try {
+        const created = await invokeEncountersApi("/encounters", "POST", {
+          encounter_date: encounterDate,
+          visit_type: "office_followup",
+          patient_type: patientType,
+          pos: placeOfService,
+          telehealth: isTelehealth,
+          minutes: codingPath === "time" ? Math.max(0, Number(totalMinutes || 0)) : null,
+        });
+        const encounterId = created.encounter_id;
+        setActiveEncounterId(encounterId);
 
-      const row = data?.analysis;
-      if (!row) throw new Error("No analysis response received");
+        await invokeEncountersApi(`/encounters/${encounterId}/note`, "POST", {
+          raw_note: effectiveNote,
+          source: "manual",
+        });
 
-      const mapped = {
-        id: row.id,
-        at: new Date(row.created_at).toLocaleString(),
-        specialty: row.specialty || specialty,
-        billedCode: row.billed_code || billedCode,
-        suggestedCode: row.suggested_code,
-        modelVersion: row.model_version || "rules-v1.0",
-        encounterContext: row.encounter_context || encounterContext,
-        confidence: Number(row.confidence),
-        estimatedDeltaPerVisit: Number(row.estimated_delta_per_visit || 0),
-        noteSnippet: row.note_snippet || "",
-        rationale: row.rationale || [],
-        gaps: row.gaps || [],
-        suggestions: row.suggestions || [],
-        estimatedMonthlyRecovery: Number(row.estimated_monthly_recovery || 0),
-        reviewStatus: row.review_status || "pending",
-        reviewerCode: row.reviewer_code || "",
-        reviewerNotes: row.reviewer_notes || "",
-        acceptedCode: row.accepted_code || "",
-        acceptedAt: row.accepted_at || null,
-      };
+        const analyzed = await invokeEncountersApi(`/encounters/${encounterId}/analyze`, "POST", {
+          current_code: billedCode,
+          payer_name: "FALLBACK",
+          state: "NA",
+          specialty,
+          context: encounterContext,
+        });
+
+        const rec = analyzed.recommendation || {};
+        const rev = analyzed.revenue_impact || {};
+        const confidenceMap = { high: 0.9, medium: 0.75, low: 0.6 };
+        const gapText = rec.documentation_gap_text || "";
+        const gapItems = gapText ? gapText.split(/(?<=\.)\s+/).filter(Boolean) : [];
+
+        mapped = {
+          id: `${encounterId}:${Date.now()}`,
+          at: new Date().toLocaleString(),
+          specialty,
+          billedCode,
+          suggestedCode: rec.suggested_code,
+          modelVersion: analyzed.rule_version || "rules-v1.0-em-core",
+          encounterContext,
+          confidence: confidenceMap[rec.confidence] || 0.75,
+          estimatedDeltaPerVisit: Number(rev.delta_amount || 0),
+          noteSnippet: "",
+          rationale: rec.rationale || [],
+          gaps: gapItems,
+          suggestions: gapItems,
+          estimatedMonthlyRecovery: Number(rev.delta_amount || 0) * 80,
+          reviewStatus: "pending",
+          reviewerCode: "",
+          reviewerNotes: "",
+          acceptedCode: "",
+          acceptedAt: null,
+          encounterId,
+        };
+      } catch (encountersApiError) {
+        const { data, error: invokeError } = await supabase.functions.invoke("analyze-encounter", {
+          body: { note: effectiveNote, billedCode, specialty, context: encounterContext },
+        });
+
+        if (invokeError) throw invokeError;
+        const row = data?.analysis;
+        if (!row) throw new Error("No analysis response received");
+
+        mapped = {
+          id: row.id,
+          at: new Date(row.created_at).toLocaleString(),
+          specialty: row.specialty || specialty,
+          billedCode: row.billed_code || billedCode,
+          suggestedCode: row.suggested_code,
+          modelVersion: row.model_version || "rules-v1.0",
+          encounterContext: row.encounter_context || encounterContext,
+          confidence: Number(row.confidence),
+          estimatedDeltaPerVisit: Number(row.estimated_delta_per_visit || 0),
+          noteSnippet: row.note_snippet || "",
+          rationale: row.rationale || [],
+          gaps: row.gaps || [],
+          suggestions: row.suggestions || [],
+          estimatedMonthlyRecovery: Number(row.estimated_monthly_recovery || 0),
+          reviewStatus: row.review_status || "pending",
+          reviewerCode: row.reviewer_code || "",
+          reviewerNotes: row.reviewer_notes || "",
+          acceptedCode: row.accepted_code || "",
+          acceptedAt: row.accepted_at || null,
+        };
+        console.warn("encounters-api unavailable, used analyze-encounter fallback:", encountersApiError?.message || encountersApiError);
+      }
 
       setAnalysis({
         id: mapped.id,
+        encounterId: mapped.encounterId || null,
         suggestedCode: mapped.suggestedCode,
         modelVersion: mapped.modelVersion,
         rationale: mapped.rationale,
@@ -7195,20 +7279,32 @@ const RevenueCaptureTool = ({ onBack }) => {
 
     await copyText("Finalized packet copied", packet);
 
-    if (!isSupabaseConfigured() || !analysis.id) return;
-
     const acceptedAt = new Date().toISOString();
-    const { error: updateError } = await supabase
-      .from("encounter_analyses")
-      .update({
-        accepted_code: analysis.suggestedCode,
-        accepted_at: acceptedAt,
-      })
-      .eq("id", analysis.id);
+    const encounterIdForSelection = analysis.encounterId || activeEncounterId;
 
-    if (updateError) {
-      setError(updateError.message || "Could not save finalization.");
-      return;
+    if (encounterIdForSelection) {
+      try {
+        await invokeEncountersApi(`/encounters/${encounterIdForSelection}/select-code`, "POST", {
+          selected_code: analysis.suggestedCode,
+          selection_reason: "accepted_suggestion",
+        });
+      } catch (apiError) {
+        setError(apiError.message || "Could not save finalization.");
+        return;
+      }
+    } else if (isSupabaseConfigured() && analysis.id) {
+      const { error: updateError } = await supabase
+        .from("encounter_analyses")
+        .update({
+          accepted_code: analysis.suggestedCode,
+          accepted_at: acceptedAt,
+        })
+        .eq("id", analysis.id);
+
+      if (updateError) {
+        setError(updateError.message || "Could not save finalization.");
+        return;
+      }
     }
 
     setHistory((prev) => prev.map((h) => (
@@ -7230,6 +7326,11 @@ const RevenueCaptureTool = ({ onBack }) => {
 
   const saveReview = async (item) => {
     if (!isSupabaseConfigured()) return;
+    if (item.encounterId && String(item.id || "").includes(":")) {
+      setCopied("Review persistence for new guardrail records is next step");
+      setTimeout(() => setCopied(""), 1400);
+      return;
+    }
     const draft = reviewDrafts[item.id] || {};
     const reviewStatus = draft.reviewStatus || item.reviewStatus || "pending";
     const reviewerCode = draft.reviewerCode ?? item.reviewerCode ?? "";

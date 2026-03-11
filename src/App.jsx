@@ -6766,6 +6766,11 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [note, setNote] = useState("");
   const [billedCode, setBilledCode] = useState("99213");
   const [specialty, setSpecialty] = useState("General");
+  const [patientType, setPatientType] = useState("established");
+  const [placeOfService, setPlaceOfService] = useState("office");
+  const [codingPath, setCodingPath] = useState("mdm");
+  const [totalMinutes, setTotalMinutes] = useState("");
+  const [isTelehealth, setIsTelehealth] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [history, setHistory] = useState([]);
   const [copied, setCopied] = useState("");
@@ -6802,7 +6807,7 @@ const RevenueCaptureTool = ({ onBack }) => {
 
       const { data, error: historyError } = await supabase
         .from("encounter_analyses")
-        .select("id, specialty, billed_code, suggested_code, confidence, estimated_delta_per_visit, note_snippet, created_at, rationale, gaps, suggestions, estimated_monthly_recovery, review_status, reviewer_code, reviewer_notes, accepted_code, accepted_at")
+        .select("id, specialty, billed_code, suggested_code, model_version, encounter_context, confidence, estimated_delta_per_visit, note_snippet, created_at, rationale, gaps, suggestions, estimated_monthly_recovery, review_status, reviewer_code, reviewer_notes, accepted_code, accepted_at")
         .order("created_at", { ascending: false })
         .limit(20);
 
@@ -6814,6 +6819,8 @@ const RevenueCaptureTool = ({ onBack }) => {
         specialty: row.specialty || "General",
         billedCode: row.billed_code,
         suggestedCode: row.suggested_code,
+        modelVersion: row.model_version || "rules-v1.0",
+        encounterContext: row.encounter_context || {},
         confidence: Number(row.confidence),
         estimatedDeltaPerVisit: Number(row.estimated_delta_per_visit || 0),
         noteSnippet: row.note_snippet || "",
@@ -6933,8 +6940,16 @@ const RevenueCaptureTool = ({ onBack }) => {
     setError(null);
 
     try {
+      const encounterContext = {
+        patientType,
+        placeOfService,
+        codingPath,
+        totalMinutes: codingPath === "time" ? Math.max(0, Number(totalMinutes || 0)) : null,
+        telehealth: isTelehealth,
+      };
+
       const { data, error: invokeError } = await supabase.functions.invoke("analyze-encounter", {
-        body: { note: effectiveNote, billedCode, specialty },
+        body: { note: effectiveNote, billedCode, specialty, context: encounterContext },
       });
 
       if (invokeError) throw invokeError;
@@ -6948,6 +6963,8 @@ const RevenueCaptureTool = ({ onBack }) => {
         specialty: row.specialty || specialty,
         billedCode: row.billed_code || billedCode,
         suggestedCode: row.suggested_code,
+        modelVersion: row.model_version || "rules-v1.0",
+        encounterContext: row.encounter_context || encounterContext,
         confidence: Number(row.confidence),
         estimatedDeltaPerVisit: Number(row.estimated_delta_per_visit || 0),
         noteSnippet: row.note_snippet || "",
@@ -6965,6 +6982,7 @@ const RevenueCaptureTool = ({ onBack }) => {
       setAnalysis({
         id: mapped.id,
         suggestedCode: mapped.suggestedCode,
+        modelVersion: mapped.modelVersion,
         rationale: mapped.rationale,
         confidence: mapped.confidence,
         gaps: mapped.gaps,
@@ -7030,6 +7048,22 @@ const RevenueCaptureTool = ({ onBack }) => {
   const reviewedCases = history.filter((h) => h.reviewStatus && h.reviewStatus !== "pending");
   const agreeCases = reviewedCases.filter((h) => h.reviewStatus === "agree");
   const agreementRate = reviewedCases.length > 0 ? Math.round((agreeCases.length / reviewedCases.length) * 100) : 0;
+  const versionStats = Object.values(history.reduce((acc, item) => {
+    const key = item.modelVersion || "rules-v1.0";
+    if (!acc[key]) {
+      acc[key] = { version: key, total: 0, reviewed: 0, agree: 0 };
+    }
+    acc[key].total += 1;
+    if (item.reviewStatus && item.reviewStatus !== "pending") {
+      acc[key].reviewed += 1;
+      if (item.reviewStatus === "agree") acc[key].agree += 1;
+    }
+    return acc;
+  }, {})).map((s) => ({
+    ...s,
+    agreement: s.reviewed > 0 ? Math.round((s.agree / s.reviewed) * 100) : 0,
+  }));
+  const activeModelVersion = history[0]?.modelVersion || analysis?.modelVersion || "rules-v1.3-context";
   const queuePendingCount = queueItems.filter((item) => item.status === "pending").length;
   const queueDoneCount = queueItems.filter((item) => item.status === "done").length;
 
@@ -7418,6 +7452,77 @@ const RevenueCaptureTool = ({ onBack }) => {
                   <option>Pain Management</option>
                 </select>
               </div>
+              <div>
+                <div style={{ fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px" }}>Patient Type</div>
+                <select
+                  value={patientType}
+                  onChange={(e) => setPatientType(e.target.value)}
+                  style={{
+                    padding: "10px 12px", borderRadius: DS.radius.sm,
+                    border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bg,
+                    color: DS.colors.text, fontSize: "14px",
+                  }}
+                >
+                  <option value="established">Established</option>
+                  <option value="new">New</option>
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px" }}>POS</div>
+                <select
+                  value={placeOfService}
+                  onChange={(e) => setPlaceOfService(e.target.value)}
+                  style={{
+                    padding: "10px 12px", borderRadius: DS.radius.sm,
+                    border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bg,
+                    color: DS.colors.text, fontSize: "14px",
+                  }}
+                >
+                  <option value="office">Office</option>
+                  <option value="hospital">Hospital</option>
+                  <option value="telehealth">Telehealth</option>
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px" }}>Coding Path</div>
+                <select
+                  value={codingPath}
+                  onChange={(e) => setCodingPath(e.target.value)}
+                  style={{
+                    padding: "10px 12px", borderRadius: DS.radius.sm,
+                    border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bg,
+                    color: DS.colors.text, fontSize: "14px",
+                  }}
+                >
+                  <option value="mdm">MDM</option>
+                  <option value="time">Time</option>
+                </select>
+              </div>
+              {codingPath === "time" && (
+                <div>
+                  <div style={{ fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px" }}>Total Minutes</div>
+                  <input
+                    type="number"
+                    min={0}
+                    value={totalMinutes}
+                    onChange={(e) => setTotalMinutes(e.target.value)}
+                    style={{
+                      width: "120px",
+                      padding: "10px 12px", borderRadius: DS.radius.sm,
+                      border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bg,
+                      color: DS.colors.text, fontSize: "14px",
+                    }}
+                  />
+                </div>
+              )}
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: DS.colors.textMuted, paddingBottom: "10px" }}>
+                <input
+                  type="checkbox"
+                  checked={isTelehealth}
+                  onChange={(e) => setIsTelehealth(e.target.checked)}
+                />
+                Telehealth encounter
+              </label>
               <Button primary onClick={() => !analyzing && runAnalysis()} style={{ opacity: analyzing ? 0.7 : 1 }}>
                 {analyzing ? "Analyzing..." : "Analyze Encounter"}
               </Button>
@@ -7461,6 +7566,34 @@ const RevenueCaptureTool = ({ onBack }) => {
                 <MetricCard small label="Agreement Rate" value={`${agreementRate}%`} color={agreementRate >= 80 ? DS.colors.vital : DS.colors.warn} />
                 <MetricCard small label="Manual Review Pending" value={(history.length - reviewedCases.length).toString()} color={DS.colors.warn} />
               </div>
+              <div style={{ marginTop: "10px", fontSize: "12px", color: DS.colors.textMuted }}>
+                Active model version: <span style={{ color: DS.colors.text, fontFamily: DS.fonts.mono }}>{activeModelVersion}</span>
+              </div>
+              {versionStats.length > 0 && (
+                <div style={{ marginTop: "10px", display: "grid", gap: "6px" }}>
+                  {versionStats.map((row) => (
+                    <div
+                      key={row.version}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr auto auto auto",
+                        gap: "10px",
+                        alignItems: "center",
+                        padding: "6px 8px",
+                        borderRadius: DS.radius.sm,
+                        border: `1px solid ${DS.colors.border}`,
+                        background: DS.colors.bg,
+                        fontSize: "12px",
+                      }}
+                    >
+                      <span style={{ color: DS.colors.text, fontFamily: DS.fonts.mono }}>{row.version}</span>
+                      <span style={{ color: DS.colors.textMuted }}>n={row.total}</span>
+                      <span style={{ color: DS.colors.textMuted }}>reviewed={row.reviewed}</span>
+                      <span style={{ color: row.agreement >= 80 ? DS.colors.vital : DS.colors.warn }}>{row.agreement}% agree</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
 
             {lowConfidence && (
@@ -7570,6 +7703,9 @@ const RevenueCaptureTool = ({ onBack }) => {
                         <div style={{ fontSize: "12px", color: DS.colors.textMuted }}>
                           [{h.specialty}]{" "}
                           {h.billedCode} {"->"} {h.suggestedCode} ({Math.round(h.confidence * 100)}%)
+                        </div>
+                        <div style={{ marginTop: "4px", fontSize: "11px", color: DS.colors.textDim, fontFamily: DS.fonts.mono }}>
+                          {h.modelVersion || "rules-v1.0"}
                         </div>
                         <div style={{ marginTop: "8px", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
                           <select

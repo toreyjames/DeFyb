@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -381,6 +381,7 @@ serve(async (req) => {
         rule_version: RULE_VERSION,
         signals,
         recommendation: {
+          recommendation_id: rec.id,
           suggested_code: recommendation.suggested_code,
           confidence: recommendation.confidence,
           rationale: recommendation.rationale,
@@ -440,6 +441,64 @@ serve(async (req) => {
       });
 
       return json(200, { status: "ok", selected_code: selectedCode });
+    }
+
+    // POST /encounters/{id}/review
+    if (req.method === "POST" && route.length === 3 && route[0] === "encounters" && route[2] === "review") {
+      const encounterId = route[1];
+      const body = await req.json();
+      const reviewStatus = String(body.review_status || "pending").trim();
+      const reviewerCode = body.reviewer_code ? String(body.reviewer_code).trim() : null;
+      const reviewerNotes = body.reviewer_notes ? String(body.reviewer_notes).trim() : null;
+
+      if (!["pending", "agree", "disagree"].includes(reviewStatus)) {
+        return json(400, { error: "review_status must be pending|agree|disagree" });
+      }
+
+      const { data: encounter, error: encounterError } = await client
+        .from("encounters")
+        .select("id, practice_id")
+        .eq("id", encounterId)
+        .single();
+      if (encounterError || !encounter) return json(404, { error: "Encounter not found" });
+
+      const { data: latestRec, error: recError } = await client
+        .from("code_recommendations")
+        .select("id, suggested_code")
+        .eq("encounter_id", encounterId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      if (recError || !latestRec) return json(404, { error: "No recommendation found for encounter" });
+
+      const resolvedReviewerCode = reviewerCode || (reviewStatus === "agree" ? latestRec.suggested_code : null);
+      const resolvedStatus = reviewStatus === "pending" ? "suggested" : `reviewed_${reviewStatus}`;
+
+      const { error: updateError } = await client
+        .from("code_recommendations")
+        .update({
+          review_status: reviewStatus,
+          reviewer_code: resolvedReviewerCode,
+          reviewer_notes: reviewerNotes,
+          reviewed_at: new Date().toISOString(),
+          status: resolvedStatus,
+          current_user_selected_code: resolvedReviewerCode || null,
+        })
+        .eq("id", latestRec.id);
+      if (updateError) return json(400, { error: updateError.message });
+
+      await emitAudit(encounter.practice_id, "recommendation_reviewed", encounterId, {
+        recommendation_id: latestRec.id,
+        review_status: reviewStatus,
+        reviewer_code: resolvedReviewerCode,
+      });
+
+      return json(200, {
+        status: "ok",
+        recommendation_id: latestRec.id,
+        review_status: reviewStatus,
+        reviewer_code: resolvedReviewerCode,
+      });
     }
 
     // GET /encounters/{id}
@@ -559,4 +618,3 @@ serve(async (req) => {
     return json(400, { error: (error as Error).message });
   }
 });
-

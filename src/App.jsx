@@ -7017,6 +7017,7 @@ const RevenueCaptureTool = ({ onBack }) => {
           specialty,
           billedCode,
           suggestedCode: rec.suggested_code,
+          recommendationId: rec.recommendation_id || null,
           modelVersion: analyzed.rule_version || "rules-v1.0-em-core",
           encounterContext,
           confidence: confidenceMap[rec.confidence] || 0.75,
@@ -7048,6 +7049,7 @@ const RevenueCaptureTool = ({ onBack }) => {
           specialty: row.specialty || specialty,
           billedCode: row.billed_code || billedCode,
           suggestedCode: row.suggested_code,
+          recommendationId: null,
           modelVersion: row.model_version || "rules-v1.0",
           encounterContext: row.encounter_context || encounterContext,
           confidence: Number(row.confidence),
@@ -7326,15 +7328,31 @@ const RevenueCaptureTool = ({ onBack }) => {
 
   const saveReview = async (item) => {
     if (!isSupabaseConfigured()) return;
-    if (item.encounterId && String(item.id || "").includes(":")) {
-      setCopied("Review persistence for new guardrail records is next step");
-      setTimeout(() => setCopied(""), 1400);
-      return;
-    }
     const draft = reviewDrafts[item.id] || {};
     const reviewStatus = draft.reviewStatus || item.reviewStatus || "pending";
     const reviewerCode = draft.reviewerCode ?? item.reviewerCode ?? "";
     const reviewerNotes = draft.reviewerNotes ?? item.reviewerNotes ?? "";
+
+    if (item.encounterId) {
+      try {
+        await invokeEncountersApi(`/encounters/${item.encounterId}/review`, "POST", {
+          review_status: reviewStatus,
+          reviewer_code: reviewerCode || null,
+          reviewer_notes: reviewerNotes || null,
+        });
+
+        setHistory((prev) => prev.map((h) => (
+          h.id === item.id
+            ? { ...h, reviewStatus, reviewerCode, reviewerNotes }
+            : h
+        )));
+        setReviewDrafts((prev) => ({ ...prev, [item.id]: {} }));
+        return;
+      } catch (apiError) {
+        setError(apiError.message || "Could not save review.");
+        return;
+      }
+    }
 
     const payload = {
       review_status: reviewStatus,

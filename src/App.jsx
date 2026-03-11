@@ -6772,6 +6772,7 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [totalMinutes, setTotalMinutes] = useState("");
   const [isTelehealth, setIsTelehealth] = useState(false);
   const [encounterDate, setEncounterDate] = useState(new Date().toISOString().slice(0, 10));
+  const [surgeryDate, setSurgeryDate] = useState("");
   const [analysis, setAnalysis] = useState(null);
   const [history, setHistory] = useState([]);
   const [copied, setCopied] = useState("");
@@ -6948,6 +6949,7 @@ const RevenueCaptureTool = ({ onBack }) => {
         totalMinutes: codingPath === "time" ? Math.max(0, Number(totalMinutes || 0)) : null,
         telehealth: isTelehealth,
         encounterDate,
+        surgeryDate: surgeryDate || null,
       };
 
       const { data, error: invokeError } = await supabase.functions.invoke("analyze-encounter", {
@@ -7479,6 +7481,19 @@ const RevenueCaptureTool = ({ onBack }) => {
                   type="date"
                   value={encounterDate}
                   onChange={(e) => setEncounterDate(e.target.value)}
+                  style={{
+                    padding: "10px 12px", borderRadius: DS.radius.sm,
+                    border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bg,
+                    color: DS.colors.text, fontSize: "14px",
+                  }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px" }}>Surgery Date (optional)</div>
+                <input
+                  type="date"
+                  value={surgeryDate}
+                  onChange={(e) => setSurgeryDate(e.target.value)}
                   style={{
                     padding: "10px 12px", borderRadius: DS.radius.sm,
                     border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bg,

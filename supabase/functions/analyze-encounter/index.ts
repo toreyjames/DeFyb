@@ -17,6 +17,7 @@ type AnalyzeRequest = {
     totalMinutes?: number;
     telehealth?: boolean;
     encounterDate?: string;
+    surgeryDate?: string;
   };
 };
 
@@ -30,24 +31,67 @@ const toDateOrNull = (value?: string | null): Date | null => {
   return parsed;
 };
 
-const parseSurgeryDateFromNote = (noteText: string): Date | null => {
+const parseMonthNameDate = (value: string): Date | null => {
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  const parsed = toDateOrNull(cleaned);
+  return parsed;
+};
+
+const parseNumericDate = (value: string, encounterDate: Date): Date | null => {
+  const text = (value || "").trim();
+  if (!text) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return toDateOrNull(text);
+
+  const m = text.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/);
+  if (!m) return null;
+  const mm = Number(m[1]);
+  const dd = Number(m[2]);
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+
+  let yyyy = encounterDate.getFullYear();
+  if (m[3]) {
+    const rawYear = Number(m[3]);
+    yyyy = rawYear < 100 ? 2000 + rawYear : rawYear;
+  }
+
+  const candidate = new Date(Date.UTC(yyyy, mm - 1, dd));
+  if (Number.isNaN(candidate.getTime())) return null;
+
+  // If year omitted and candidate is in future relative to encounter date, roll back one year.
+  const encounterUTC = new Date(Date.UTC(encounterDate.getFullYear(), encounterDate.getMonth(), encounterDate.getDate()));
+  if (!m[3] && candidate.getTime() > encounterUTC.getTime()) {
+    candidate.setUTCFullYear(candidate.getUTCFullYear() - 1);
+  }
+
+  return toDateOrNull(candidate.toISOString().slice(0, 10));
+};
+
+const parseSurgeryDateFromNote = (noteText: string, encounterDate: Date): Date | null => {
   const note = noteText || "";
   const lower = note.toLowerCase();
-  const markerRegex = /(surgery date|date of surgery|dos|status post|s\/p|post[-\s]?op)/i;
+  const markerRegex = /(surgery date|date of surgery|dos|d\/o\/s|sx date|date of procedure|status post|s\/p|post[-\s]?op)/i;
   if (!markerRegex.test(lower)) return null;
 
-  // Prefer dates near explicit surgery markers.
-  const nearby = /(?:surgery date|date of surgery|dos|status post|s\/p|post[-\s]?op)[^\n\r]{0,40}?(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\s+\d{1,2},\s+\d{4})/gi;
-  const nearbyMatch = nearby.exec(note);
-  if (nearbyMatch?.[1]) {
-    const parsed = toDateOrNull(nearbyMatch[1]);
-    if (parsed) return parsed;
+  // Prefer dates near explicit surgery markers with many clinic shorthand variants.
+  const nearbyPatterns = [
+    /(?:surgery date|date of surgery|dos|d\/o\/s|sx date|date of procedure)\s*[:\-]?\s*(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4})/gi,
+    /(?:status post|s\/p|post[-\s]?op)[^\n\r]{0,60}?(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4})/gi,
+  ];
+
+  for (const pattern of nearbyPatterns) {
+    const match = pattern.exec(note);
+    if (match?.[1]) {
+      const raw = match[1].trim();
+      const parsed = parseNumericDate(raw, encounterDate) || parseMonthNameDate(raw);
+      if (parsed) return parsed;
+    }
   }
 
   // Fallback: use first recognizable date if the note is clearly post-op.
-  const fallback = /(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\s+\d{1,2},\s+\d{4})/i.exec(note);
+  const fallback = /(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4})/i.exec(note);
   if (!fallback?.[1]) return null;
-  return toDateOrNull(fallback[1]);
+  return parseNumericDate(fallback[1], encounterDate) || parseMonthNameDate(fallback[1]);
 };
 
 const analyzeEncounterNote = (
@@ -57,7 +101,7 @@ const analyzeEncounterNote = (
 ) => {
   const normalized = (noteText || "").toLowerCase();
   const encounterDate = toDateOrNull(context?.encounterDate) || toDateOrNull(new Date().toISOString().slice(0, 10))!;
-  const surgeryDate = parseSurgeryDateFromNote(noteText || "");
+  const surgeryDate = toDateOrNull(context?.surgeryDate) || parseSurgeryDateFromNote(noteText || "", encounterDate);
   const isPostOpLanguage = /(post[-\s]?op|status post|s\/p|global period)/.test(normalized);
   const hasDataReview = /(mri|x-?ray|ct|imaging|lab|reviewed records|independent historian)/.test(normalized);
   const hasProblemComplexity = /(chronic|worsening|exacerbation|persistent pain|multiple conditions)/.test(normalized);

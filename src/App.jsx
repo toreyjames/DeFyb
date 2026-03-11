@@ -6808,43 +6808,56 @@ const RevenueCaptureTool = ({ onBack }) => {
     }
   };
 
-  useEffect(() => {
-    const loadHistory = async () => {
-      if (!isSupabaseConfigured()) return;
-
-      const { data, error: historyError } = await supabase
-        .from("encounter_analyses")
-        .select("id, specialty, billed_code, suggested_code, model_version, encounter_context, confidence, estimated_delta_per_visit, note_snippet, created_at, rationale, gaps, suggestions, estimated_monthly_recovery, review_status, reviewer_code, reviewer_notes, accepted_code, accepted_at")
-        .order("created_at", { ascending: false })
-        .limit(20);
-
-      if (historyError || !data) return;
-
-      const mapped = data.map((row) => ({
-        id: row.id,
+  const mapEncounterListToHistory = (encounters = []) => (
+    encounters.map((row) => {
+      const rec = row.latest_recommendation || {};
+      const rev = row.latest_revenue_impact || {};
+      const gapText = rec.documentation_gap_text || "";
+      const gapItems = gapText ? gapText.split(/(?<=\.)\s+/).filter(Boolean) : [];
+      const selectedCode = rec.current_user_selected_code || "";
+      const acceptedAt = selectedCode ? (rec.reviewed_at || rec.created_at || null) : null;
+      return {
+        id: rec.id || row.id,
         at: new Date(row.created_at).toLocaleString(),
-        specialty: row.specialty || "General",
-        billedCode: row.billed_code,
-        suggestedCode: row.suggested_code,
-        modelVersion: row.model_version || "rules-v1.0",
-        encounterContext: row.encounter_context || {},
-        confidence: Number(row.confidence),
-        estimatedDeltaPerVisit: Number(row.estimated_delta_per_visit || 0),
-        noteSnippet: row.note_snippet || "",
-        rationale: row.rationale || [],
-        gaps: row.gaps || [],
-        suggestions: row.suggestions || [],
-        estimatedMonthlyRecovery: Number(row.estimated_monthly_recovery || 0),
-        reviewStatus: row.review_status || "pending",
-        reviewerCode: row.reviewer_code || "",
-        reviewerNotes: row.reviewer_notes || "",
-        acceptedCode: row.accepted_code || "",
-        acceptedAt: row.accepted_at || null,
-      }));
+        specialty: "General",
+        billedCode: rev.current_code || "99213",
+        suggestedCode: rec.suggested_code || rev.suggested_code || "99213",
+        recommendationId: rec.id || null,
+        modelVersion: rec.rule_version || "rules-v1.0-em-core",
+        encounterContext: {
+          patientType: row.patient_type || "established",
+          placeOfService: row.pos || "office",
+          telehealth: Boolean(row.telehealth),
+          encounterDate: row.encounter_date || null,
+        },
+        confidence: rec.confidence === "high" ? 0.9 : rec.confidence === "medium" ? 0.75 : rec.confidence === "low" ? 0.6 : 0.75,
+        estimatedDeltaPerVisit: Number(rev.delta_amount || 0),
+        noteSnippet: "",
+        rationale: rec.rationale_json || [],
+        gaps: gapItems,
+        suggestions: gapItems,
+        estimatedMonthlyRecovery: Number(rev.delta_amount || 0) * 80,
+        reviewStatus: rec.review_status || "pending",
+        reviewerCode: rec.reviewer_code || "",
+        reviewerNotes: rec.reviewer_notes || "",
+        acceptedCode: selectedCode,
+        acceptedAt,
+        encounterId: row.id,
+      };
+    })
+  );
 
-      setHistory(mapped);
-    };
+  const loadHistory = async () => {
+    if (!isSupabaseConfigured()) return;
+    try {
+      const payload = await invokeEncountersApi("/encounters?limit=20", "GET");
+      setHistory(mapEncounterListToHistory(payload?.encounters || []));
+    } catch (historyError) {
+      console.warn("history unavailable:", historyError?.message || historyError);
+    }
+  };
 
+  useEffect(() => {
     const loadBillingProfile = async () => {
       if (!isSupabaseConfigured()) return;
       const { data } = await supabase
@@ -7001,93 +7014,59 @@ const RevenueCaptureTool = ({ onBack }) => {
 
       let mapped = null;
 
-      try {
-        const created = await invokeEncountersApi("/encounters", "POST", {
-          encounter_date: encounterDate,
-          visit_type: "office_followup",
-          patient_type: patientType,
-          pos: placeOfService,
-          telehealth: isTelehealth,
-          minutes: codingPath === "time" ? Math.max(0, Number(totalMinutes || 0)) : null,
-        });
-        const encounterId = created.encounter_id;
-        setActiveEncounterId(encounterId);
+      const created = await invokeEncountersApi("/encounters", "POST", {
+        encounter_date: encounterDate,
+        visit_type: "office_followup",
+        patient_type: patientType,
+        pos: placeOfService,
+        telehealth: isTelehealth,
+        minutes: codingPath === "time" ? Math.max(0, Number(totalMinutes || 0)) : null,
+      });
+      const encounterId = created.encounter_id;
+      setActiveEncounterId(encounterId);
 
-        await invokeEncountersApi(`/encounters/${encounterId}/note`, "POST", {
-          raw_note: effectiveNote,
-          source: "manual",
-        });
+      await invokeEncountersApi(`/encounters/${encounterId}/note`, "POST", {
+        raw_note: effectiveNote,
+        source: "manual",
+      });
 
-        const analyzed = await invokeEncountersApi(`/encounters/${encounterId}/analyze`, "POST", {
-          current_code: billedCode,
-          payer_name: "FALLBACK",
-          state: "NA",
-          specialty,
-          context: encounterContext,
-        });
+      const analyzed = await invokeEncountersApi(`/encounters/${encounterId}/analyze`, "POST", {
+        current_code: billedCode,
+        payer_name: "FALLBACK",
+        state: "NA",
+        specialty,
+        context: encounterContext,
+      });
 
-        const rec = analyzed.recommendation || {};
-        const rev = analyzed.revenue_impact || {};
-        const confidenceMap = { high: 0.9, medium: 0.75, low: 0.6 };
-        const gapText = rec.documentation_gap_text || "";
-        const gapItems = gapText ? gapText.split(/(?<=\.)\s+/).filter(Boolean) : [];
+      const rec = analyzed.recommendation || {};
+      const rev = analyzed.revenue_impact || {};
+      const confidenceMap = { high: 0.9, medium: 0.75, low: 0.6 };
+      const gapText = rec.documentation_gap_text || "";
+      const gapItems = gapText ? gapText.split(/(?<=\.)\s+/).filter(Boolean) : [];
 
-        mapped = {
-          id: `${encounterId}:${Date.now()}`,
-          at: new Date().toLocaleString(),
-          specialty,
-          billedCode,
-          suggestedCode: rec.suggested_code,
-          recommendationId: rec.recommendation_id || null,
-          modelVersion: analyzed.rule_version || "rules-v1.0-em-core",
-          encounterContext,
-          confidence: confidenceMap[rec.confidence] || 0.75,
-          estimatedDeltaPerVisit: Number(rev.delta_amount || 0),
-          noteSnippet: "",
-          rationale: rec.rationale || [],
-          gaps: gapItems,
-          suggestions: gapItems,
-          estimatedMonthlyRecovery: Number(rev.delta_amount || 0) * 80,
-          reviewStatus: "pending",
-          reviewerCode: "",
-          reviewerNotes: "",
-          acceptedCode: "",
-          acceptedAt: null,
-          encounterId,
-        };
-      } catch (encountersApiError) {
-        const { data, error: invokeError } = await supabase.functions.invoke("analyze-encounter", {
-          body: { note: effectiveNote, billedCode, specialty, context: encounterContext },
-        });
-
-        if (invokeError) throw invokeError;
-        const row = data?.analysis;
-        if (!row) throw new Error("No analysis response received");
-
-        mapped = {
-          id: row.id,
-          at: new Date(row.created_at).toLocaleString(),
-          specialty: row.specialty || specialty,
-          billedCode: row.billed_code || billedCode,
-          suggestedCode: row.suggested_code,
-          recommendationId: null,
-          modelVersion: row.model_version || "rules-v1.0",
-          encounterContext: row.encounter_context || encounterContext,
-          confidence: Number(row.confidence),
-          estimatedDeltaPerVisit: Number(row.estimated_delta_per_visit || 0),
-          noteSnippet: row.note_snippet || "",
-          rationale: row.rationale || [],
-          gaps: row.gaps || [],
-          suggestions: row.suggestions || [],
-          estimatedMonthlyRecovery: Number(row.estimated_monthly_recovery || 0),
-          reviewStatus: row.review_status || "pending",
-          reviewerCode: row.reviewer_code || "",
-          reviewerNotes: row.reviewer_notes || "",
-          acceptedCode: row.accepted_code || "",
-          acceptedAt: row.accepted_at || null,
-        };
-        console.warn("encounters-api unavailable, used analyze-encounter fallback:", encountersApiError?.message || encountersApiError);
-      }
+      mapped = {
+        id: rec.recommendation_id || encounterId,
+        at: new Date().toLocaleString(),
+        specialty,
+        billedCode,
+        suggestedCode: rec.suggested_code,
+        recommendationId: rec.recommendation_id || null,
+        modelVersion: analyzed.rule_version || "rules-v1.0-em-core",
+        encounterContext,
+        confidence: confidenceMap[rec.confidence] || 0.75,
+        estimatedDeltaPerVisit: Number(rev.delta_amount || 0),
+        noteSnippet: "",
+        rationale: rec.rationale || [],
+        gaps: gapItems,
+        suggestions: gapItems,
+        estimatedMonthlyRecovery: Number(rev.delta_amount || 0) * 80,
+        reviewStatus: "pending",
+        reviewerCode: "",
+        reviewerNotes: "",
+        acceptedCode: "",
+        acceptedAt: null,
+        encounterId,
+      };
 
       setAnalysis({
         id: mapped.id,
@@ -7102,6 +7081,7 @@ const RevenueCaptureTool = ({ onBack }) => {
         estimatedMonthlyRecovery: mapped.estimatedMonthlyRecovery,
       });
       setHistory((prev) => [mapped, ...prev.filter((p) => p.id !== mapped.id)].slice(0, 20));
+      loadHistory();
       loadDashboardMetrics();
 
       if (queueTargetId) {
@@ -7337,19 +7317,9 @@ const RevenueCaptureTool = ({ onBack }) => {
         setError(apiError.message || "Could not save finalization.");
         return;
       }
-    } else if (isSupabaseConfigured() && analysis.id) {
-      const { error: updateError } = await supabase
-        .from("encounter_analyses")
-        .update({
-          accepted_code: analysis.suggestedCode,
-          accepted_at: acceptedAt,
-        })
-        .eq("id", analysis.id);
-
-      if (updateError) {
-        setError(updateError.message || "Could not save finalization.");
-        return;
-      }
+    } else {
+      setError("Missing encounter reference for finalization.");
+      return;
     }
 
     setHistory((prev) => prev.map((h) => (
@@ -7357,6 +7327,7 @@ const RevenueCaptureTool = ({ onBack }) => {
         ? { ...h, acceptedCode: analysis.suggestedCode, acceptedAt }
         : h
     )));
+    loadHistory();
     loadDashboardMetrics();
   };
 
@@ -7391,6 +7362,7 @@ const RevenueCaptureTool = ({ onBack }) => {
             : h
         )));
         setReviewDrafts((prev) => ({ ...prev, [item.id]: {} }));
+        loadHistory();
         loadDashboardMetrics();
         return;
       } catch (apiError) {
@@ -7399,30 +7371,7 @@ const RevenueCaptureTool = ({ onBack }) => {
       }
     }
 
-    const payload = {
-      review_status: reviewStatus,
-      reviewer_code: reviewerCode || null,
-      reviewer_notes: reviewerNotes || null,
-      reviewed_at: new Date().toISOString(),
-    };
-
-    const { error: updateError } = await supabase
-      .from("encounter_analyses")
-      .update(payload)
-      .eq("id", item.id);
-
-    if (updateError) {
-      setError(updateError.message || "Could not save review.");
-      return;
-    }
-
-    setHistory((prev) => prev.map((h) => (
-      h.id === item.id
-        ? { ...h, reviewStatus, reviewerCode, reviewerNotes }
-        : h
-    )));
-    setReviewDrafts((prev) => ({ ...prev, [item.id]: {} }));
-    loadDashboardMetrics();
+    setError("Missing encounter reference for review.");
   };
 
   return (

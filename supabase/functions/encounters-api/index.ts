@@ -429,6 +429,7 @@ serve(async (req) => {
         .update({
           current_user_selected_code: selectedCode,
           status: "selected",
+          reviewed_at: new Date().toISOString(),
         })
         .eq("id", latestRec.id);
       if (updateError) return json(400, { error: updateError.message });
@@ -543,6 +544,58 @@ serve(async (req) => {
         recommendation_history: recs || [],
         latest_revenue_impact: rev || null,
         audit_events: audits || [],
+      });
+    }
+
+    // GET /encounters?limit=20&practice_id=uuid
+    if (req.method === "GET" && route.length === 1 && route[0] === "encounters") {
+      const query = new URL(req.url).searchParams;
+      const practiceIdParam = query.get("practice_id");
+      const limit = Math.min(100, Math.max(1, Number(query.get("limit") || "20")));
+      const practiceId = practiceIdParam || appUser?.practice_id;
+      if (!practiceId) return json(400, { error: "practice_id is required" });
+
+      const { data: encounters, error: encounterError } = await client
+        .from("encounters")
+        .select("id, practice_id, encounter_date, patient_type, pos, telehealth, status, created_at")
+        .eq("practice_id", practiceId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (encounterError) return json(400, { error: encounterError.message });
+
+      const encounterIds = (encounters || []).map((e) => e.id);
+      if (encounterIds.length === 0) return json(200, { encounters: [] });
+
+      const { data: recs } = await client
+        .from("code_recommendations")
+        .select("id, encounter_id, rule_version, suggested_code, confidence, rationale_json, documentation_gap_text, current_user_selected_code, status, review_status, reviewer_code, reviewer_notes, reviewed_at, created_at")
+        .in("encounter_id", encounterIds)
+        .order("created_at", { ascending: false });
+
+      const latestRecByEncounter = new Map<string, Record<string, unknown>>();
+      (recs || []).forEach((r) => {
+        const existing = latestRecByEncounter.get(r.encounter_id);
+        if (!existing) latestRecByEncounter.set(r.encounter_id, r as unknown as Record<string, unknown>);
+      });
+
+      const { data: impacts } = await client
+        .from("revenue_impacts")
+        .select("encounter_id, current_code, suggested_code, current_amount, suggested_amount, delta_amount, rate_source, created_at")
+        .in("encounter_id", encounterIds)
+        .order("created_at", { ascending: false });
+
+      const latestImpactByEncounter = new Map<string, Record<string, unknown>>();
+      (impacts || []).forEach((r) => {
+        const existing = latestImpactByEncounter.get(r.encounter_id);
+        if (!existing) latestImpactByEncounter.set(r.encounter_id, r as unknown as Record<string, unknown>);
+      });
+
+      return json(200, {
+        encounters: (encounters || []).map((enc) => ({
+          ...enc,
+          latest_recommendation: latestRecByEncounter.get(enc.id) || null,
+          latest_revenue_impact: latestImpactByEncounter.get(enc.id) || null,
+        })),
       });
     }
 

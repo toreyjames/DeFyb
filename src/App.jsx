@@ -8555,6 +8555,8 @@ export default function App() {
   const [teamUser, setTeamUser] = useState(null);
   const [practiceUser, setPracticeUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const hasInitializedHistory = useRef(false);
+  const isPopNavigating = useRef(false);
 
   const allowedDomains = (import.meta.env.VITE_ALLOWED_TEAM_DOMAINS || "defyb.org")
     .split(",")
@@ -8590,6 +8592,21 @@ export default function App() {
     if (window.location.search.includes("team")) return "team";
     if (window.location.search.includes("tool")) return "tool";
     return null;
+  };
+
+  const viewToUrl = (view) => {
+    if (view === "team" || view === "team-login") return "/team";
+    if (view === "tool" || view === "practice-login") return "/tool";
+    return "/";
+  };
+
+  const resolveIntentToView = (intent) => {
+    if (intent === "team") return teamUser ? "team" : "team-login";
+    if (intent === "tool") {
+      if (teamUser) return "team";
+      return practiceUser ? "tool" : "practice-login";
+    }
+    return "public";
   };
 
   // Check for existing session on mount
@@ -8651,6 +8668,46 @@ export default function App() {
       return () => subscription?.unsubscribe();
     }
   }, []);
+
+  useEffect(() => {
+    if (checkingAuth || typeof window === "undefined") return;
+
+    const targetUrl = viewToUrl(currentView);
+    const state = { defyb: true, view: currentView };
+
+    if (!hasInitializedHistory.current) {
+      window.history.replaceState(state, "", targetUrl);
+      hasInitializedHistory.current = true;
+      return;
+    }
+
+    if (isPopNavigating.current) {
+      isPopNavigating.current = false;
+      return;
+    }
+
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+    if (currentUrl !== targetUrl) {
+      window.history.pushState(state, "", targetUrl);
+    }
+  }, [currentView, checkingAuth]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const onPopState = (event) => {
+      isPopNavigating.current = true;
+      const popView = event.state?.defyb ? event.state.view : null;
+      if (popView) {
+        setCurrentView(popView);
+        return;
+      }
+      setCurrentView(resolveIntentToView(getRouteIntent()));
+    };
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [teamUser, practiceUser]);
 
   const handleTeamLogin = (user) => {
     if (!isTeamUser(user)) {

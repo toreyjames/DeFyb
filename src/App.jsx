@@ -8676,7 +8676,14 @@ export default function App() {
     const state = { defyb: true, view: currentView };
 
     if (!hasInitializedHistory.current) {
-      window.history.replaceState(state, "", targetUrl);
+      const directDeepLink = currentView !== "public" && window.history.length <= 1;
+      if (directDeepLink) {
+        // Seed an in-app root entry so browser Back from /tool or /team stays on site.
+        window.history.replaceState({ defyb: true, view: "public" }, "", "/");
+        window.history.pushState(state, "", targetUrl);
+      } else {
+        window.history.replaceState(state, "", targetUrl);
+      }
       hasInitializedHistory.current = true;
       return;
     }

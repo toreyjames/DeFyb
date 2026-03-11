@@ -6562,6 +6562,7 @@ const PracticeLogin = ({ onLogin, onBack }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [oauthUnavailable, setOauthUnavailable] = useState({ google: false, azure: false });
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
@@ -6607,7 +6608,13 @@ const PracticeLogin = ({ onLogin, onBack }) => {
       });
       if (authError) throw authError;
     } catch (err) {
-      setError(normalizeAuthError(err, "oauth"));
+      const raw = String(err?.message || err || "").toLowerCase();
+      if (raw.includes("unsupported provider") || raw.includes("provider is not enabled")) {
+        setOauthUnavailable((prev) => ({ ...prev, [provider]: true }));
+        setError(`${provider === "google" ? "Google" : "Microsoft"} sign-in is not enabled in Supabase yet. Use email/password for now.`);
+      } else {
+        setError(normalizeAuthError(err, "oauth"));
+      }
       setLoading(false);
     }
   };
@@ -6650,11 +6657,11 @@ const PracticeLogin = ({ onLogin, onBack }) => {
         </div>
 
         <div style={{ display: "grid", gap: "10px", marginBottom: "16px" }}>
-          <Button onClick={() => !loading && handleOAuth("google")} style={{ width: "100%", opacity: loading ? 0.7 : 1 }}>
-            Continue with Google
+          <Button onClick={() => !loading && !oauthUnavailable.google && handleOAuth("google")} style={{ width: "100%", opacity: (loading || oauthUnavailable.google) ? 0.55 : 1 }}>
+            {oauthUnavailable.google ? "Google (Unavailable)" : "Continue with Google"}
           </Button>
-          <Button onClick={() => !loading && handleOAuth("azure")} style={{ width: "100%", opacity: loading ? 0.7 : 1 }}>
-            Continue with Microsoft
+          <Button onClick={() => !loading && !oauthUnavailable.azure && handleOAuth("azure")} style={{ width: "100%", opacity: (loading || oauthUnavailable.azure) ? 0.55 : 1 }}>
+            {oauthUnavailable.azure ? "Microsoft (Unavailable)" : "Continue with Microsoft"}
           </Button>
         </div>
 
@@ -8156,6 +8163,7 @@ const TeamLogin = ({ onLogin, onBack }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [oauthUnavailable, setOauthUnavailable] = useState({ google: false, azure: false });
 
   const allowedDomains = (import.meta.env.VITE_ALLOWED_TEAM_DOMAINS || "defyb.org")
     .split(",")
@@ -8230,7 +8238,13 @@ const TeamLogin = ({ onLogin, onBack }) => {
       });
       if (authError) throw authError;
     } catch (err) {
-      setError(normalizeAuthError(err, "oauth"));
+      const raw = String(err?.message || err || "").toLowerCase();
+      if (raw.includes("unsupported provider") || raw.includes("provider is not enabled")) {
+        setOauthUnavailable((prev) => ({ ...prev, [provider]: true }));
+        setError(`${provider === "google" ? "Google" : "Microsoft"} sign-in is not enabled in Supabase yet. Use email/password for now.`);
+      } else {
+        setError(normalizeAuthError(err, "oauth"));
+      }
       setLoading(false);
     }
   };
@@ -8280,11 +8294,11 @@ const TeamLogin = ({ onLogin, onBack }) => {
         </div>
 
         <div style={{ display: "grid", gap: "10px", marginBottom: "16px" }}>
-          <Button onClick={() => !loading && handleOAuth("google")} style={{ width: "100%", opacity: loading ? 0.7 : 1 }}>
-            Continue with Google
+          <Button onClick={() => !loading && !oauthUnavailable.google && handleOAuth("google")} style={{ width: "100%", opacity: (loading || oauthUnavailable.google) ? 0.55 : 1 }}>
+            {oauthUnavailable.google ? "Google (Unavailable)" : "Continue with Google"}
           </Button>
-          <Button onClick={() => !loading && handleOAuth("azure")} style={{ width: "100%", opacity: loading ? 0.7 : 1 }}>
-            Continue with Microsoft
+          <Button onClick={() => !loading && !oauthUnavailable.azure && handleOAuth("azure")} style={{ width: "100%", opacity: (loading || oauthUnavailable.azure) ? 0.55 : 1 }}>
+            {oauthUnavailable.azure ? "Microsoft (Unavailable)" : "Continue with Microsoft"}
           </Button>
         </div>
 

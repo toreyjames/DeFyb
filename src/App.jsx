@@ -6562,12 +6562,14 @@ const PracticeLogin = ({ onLogin, onBack }) => {
   const [usePassword, setUsePassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
   const [linkSent, setLinkSent] = useState(false);
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setNotice(null);
 
     if (!isSupabaseConfigured()) {
       setError("Authentication not configured");
@@ -6590,6 +6592,7 @@ const PracticeLogin = ({ onLogin, onBack }) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setNotice(null);
 
     if (!isSupabaseConfigured()) {
       setError("Authentication not configured");
@@ -6614,6 +6617,7 @@ const PracticeLogin = ({ onLogin, onBack }) => {
   const handleOAuth = async (provider) => {
     setLoading(true);
     setError(null);
+    setNotice(null);
 
     if (!isSupabaseConfigured()) {
       setError("Authentication not configured");
@@ -6632,6 +6636,33 @@ const PracticeLogin = ({ onLogin, onBack }) => {
       if (authError) throw authError;
     } catch (err) {
       setError(normalizeAuthError(err, "oauth"));
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    setError(null);
+    setNotice(null);
+
+    if (!email.trim()) {
+      setError("Enter your email first, then click reset password.");
+      return;
+    }
+    if (!isSupabaseConfigured()) {
+      setError("Authentication not configured");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: window.location.origin,
+      });
+      if (resetError) throw resetError;
+      setNotice(`Password reset email sent to ${email.trim()}.`);
+    } catch (err) {
+      setError(normalizeAuthError(err, "password"));
+    } finally {
       setLoading(false);
     }
   };
@@ -6726,6 +6757,14 @@ const PracticeLogin = ({ onLogin, onBack }) => {
               {error}
             </div>
           )}
+          {notice && (
+            <div style={{
+              padding: "10px 14px", marginBottom: "16px", borderRadius: DS.radius.sm,
+              background: DS.colors.vitalDim, color: DS.colors.vital, fontSize: "13px",
+            }}>
+              {notice}
+            </div>
+          )}
 
           <button type="submit" style={{
             width: "100%", padding: "12px 28px",
@@ -6741,7 +6780,11 @@ const PracticeLogin = ({ onLogin, onBack }) => {
 
         <p style={{ textAlign: "center", marginTop: "16px", fontSize: "12px", color: DS.colors.textDim }}>
           {usePassword ? (
-            <span onClick={() => setUsePassword(false)} style={{ color: DS.colors.shock, cursor: "pointer" }}>Switch to magic link</span>
+            <>
+              <span onClick={() => setUsePassword(false)} style={{ color: DS.colors.shock, cursor: "pointer" }}>Switch to magic link</span>
+              {" • "}
+              <span onClick={() => !loading && handlePasswordReset()} style={{ color: DS.colors.shock, cursor: "pointer" }}>Forgot password</span>
+            </>
           ) : (
             <>
               No password needed or <span onClick={() => setUsePassword(true)} style={{ color: DS.colors.shock, cursor: "pointer" }}>use password</span>
@@ -8170,6 +8213,7 @@ const TeamLogin = ({ onLogin, onBack }) => {
   const [usePassword, setUsePassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
   const [linkSent, setLinkSent] = useState(false);
 
   const allowedDomains = (import.meta.env.VITE_ALLOWED_TEAM_DOMAINS || "defyb.org")
@@ -8203,6 +8247,7 @@ const TeamLogin = ({ onLogin, onBack }) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setNotice(null);
 
     if (!isSupabaseConfigured()) {
       setError("Authentication not configured");
@@ -8237,6 +8282,7 @@ const TeamLogin = ({ onLogin, onBack }) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setNotice(null);
 
     // Check for email typos
     const typoWarning = validateEmail(email);
@@ -8287,6 +8333,7 @@ const TeamLogin = ({ onLogin, onBack }) => {
   const handleOAuth = async (provider) => {
     setLoading(true);
     setError(null);
+    setNotice(null);
 
     if (!isSupabaseConfigured()) {
       setError("Authentication not configured");
@@ -8305,6 +8352,37 @@ const TeamLogin = ({ onLogin, onBack }) => {
       if (authError) throw authError;
     } catch (err) {
       setError(normalizeAuthError(err, "oauth"));
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    setError(null);
+    setNotice(null);
+
+    if (!email.trim()) {
+      setError("Enter your work email first, then click reset password.");
+      return;
+    }
+    if (!isAllowedWorkEmail(email)) {
+      setError("Use your approved clinic/work email address.");
+      return;
+    }
+    if (!isSupabaseConfigured()) {
+      setError("Authentication not configured");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: window.location.origin,
+      });
+      if (resetError) throw resetError;
+      setNotice(`Password reset email sent to ${email.trim()}.`);
+    } catch (err) {
+      setError(normalizeAuthError(err, "password"));
+    } finally {
       setLoading(false);
     }
   };
@@ -8414,6 +8492,14 @@ const TeamLogin = ({ onLogin, onBack }) => {
               {error}
             </div>
           )}
+          {notice && (
+            <div style={{
+              padding: "10px 14px", marginBottom: "16px", borderRadius: DS.radius.sm,
+              background: DS.colors.vitalDim, color: DS.colors.vital, fontSize: "13px",
+            }}>
+              {notice}
+            </div>
+          )}
 
           <button type="submit" style={{
             width: "100%", padding: "12px 28px",
@@ -8429,9 +8515,15 @@ const TeamLogin = ({ onLogin, onBack }) => {
 
         <p style={{ textAlign: "center", marginTop: "16px", fontSize: "12px", color: DS.colors.textDim }}>
           {usePassword ? (
-            <span onClick={() => setUsePassword(false)} style={{ color: DS.colors.shock, cursor: "pointer" }}>
-              Switch to magic link
-            </span>
+            <>
+              <span onClick={() => setUsePassword(false)} style={{ color: DS.colors.shock, cursor: "pointer" }}>
+                Switch to magic link
+              </span>
+              {" • "}
+              <span onClick={() => !loading && handlePasswordReset()} style={{ color: DS.colors.shock, cursor: "pointer" }}>
+                Forgot password
+              </span>
+            </>
           ) : (
             <>
               No password needed — or{" "}

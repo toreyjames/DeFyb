@@ -6793,6 +6793,8 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [activeEncounterId, setActiveEncounterId] = useState(null);
   const [encounterDetail, setEncounterDetail] = useState(null);
   const [encounterDetailLoading, setEncounterDetailLoading] = useState(false);
+  const [dashboardMetrics, setDashboardMetrics] = useState(null);
+  const [dashboardMetricsLoading, setDashboardMetricsLoading] = useState(false);
 
   const copyText = async (label, text) => {
     if (!text) return;
@@ -6952,6 +6954,23 @@ const RevenueCaptureTool = ({ onBack }) => {
     return payload;
   };
 
+  const loadDashboardMetrics = async () => {
+    if (!isSupabaseConfigured()) return;
+    try {
+      setDashboardMetricsLoading(true);
+      const metrics = await invokeEncountersApi("/dashboard/metrics", "GET");
+      setDashboardMetrics(metrics || null);
+    } catch (metricsError) {
+      console.warn("dashboard metrics unavailable:", metricsError?.message || metricsError);
+    } finally {
+      setDashboardMetricsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboardMetrics();
+  }, []);
+
   const runAnalysis = async (noteOverride = null, queueIdOverride = null, autoAdvance = true, manageLoading = true) => {
     const effectiveNote = typeof noteOverride === "string" ? noteOverride : note;
     const queueTargetId = queueIdOverride || currentQueueId;
@@ -7083,6 +7102,7 @@ const RevenueCaptureTool = ({ onBack }) => {
         estimatedMonthlyRecovery: mapped.estimatedMonthlyRecovery,
       });
       setHistory((prev) => [mapped, ...prev.filter((p) => p.id !== mapped.id)].slice(0, 20));
+      loadDashboardMetrics();
 
       if (queueTargetId) {
         let nextQueueId = null;
@@ -7141,6 +7161,14 @@ const RevenueCaptureTool = ({ onBack }) => {
   const reviewedCases = history.filter((h) => h.reviewStatus && h.reviewStatus !== "pending");
   const agreeCases = reviewedCases.filter((h) => h.reviewStatus === "agree");
   const agreementRate = reviewedCases.length > 0 ? Math.round((agreeCases.length / reviewedCases.length) * 100) : 0;
+  const apiAnalysesRun = dashboardMetrics
+    ? Object.values(dashboardMetrics.code_distribution || {}).reduce((sum, count) => sum + Number(count || 0), 0)
+    : null;
+  const apiAccepted = dashboardMetrics?.accepted_suggestions ?? null;
+  const apiOverrides = dashboardMetrics?.overridden_suggestions ?? null;
+  const apiUndercoding = dashboardMetrics?.undercoding_opportunities_detected ?? null;
+  const apiRevenueCaptured = dashboardMetrics?.estimated_revenue_captured ?? null;
+  const apiTopGaps = dashboardMetrics?.top_documentation_gaps || [];
   const versionStats = Object.values(history.reduce((acc, item) => {
     const key = item.modelVersion || "rules-v1.0";
     if (!acc[key]) {
@@ -7329,6 +7357,7 @@ const RevenueCaptureTool = ({ onBack }) => {
         ? { ...h, acceptedCode: analysis.suggestedCode, acceptedAt }
         : h
     )));
+    loadDashboardMetrics();
   };
 
   const setReviewField = (analysisId, field, value) => {
@@ -7362,6 +7391,7 @@ const RevenueCaptureTool = ({ onBack }) => {
             : h
         )));
         setReviewDrafts((prev) => ({ ...prev, [item.id]: {} }));
+        loadDashboardMetrics();
         return;
       } catch (apiError) {
         setError(apiError.message || "Could not save review.");
@@ -7392,6 +7422,7 @@ const RevenueCaptureTool = ({ onBack }) => {
         : h
     )));
     setReviewDrafts((prev) => ({ ...prev, [item.id]: {} }));
+    loadDashboardMetrics();
   };
 
   return (
@@ -7772,12 +7803,24 @@ const RevenueCaptureTool = ({ onBack }) => {
         {analysis && (
           <div style={{ marginTop: "14px", display: "grid", gap: "14px" }}>
             <Card>
-              <div style={{ fontWeight: 600, marginBottom: "10px" }}>Validation Metrics</div>
+              <div style={{ fontWeight: 600, marginBottom: "10px" }}>Practice Metrics</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px" }}>
-                <MetricCard small label="Analyses Run" value={history.length.toString()} color={DS.colors.blue} />
-                <MetricCard small label="Cases Reviewed" value={reviewedCases.length.toString()} color={DS.colors.textMuted} />
-                <MetricCard small label="Agreement Rate" value={`${agreementRate}%`} color={agreementRate >= 80 ? DS.colors.vital : DS.colors.warn} />
-                <MetricCard small label="Manual Review Pending" value={(history.length - reviewedCases.length).toString()} color={DS.colors.warn} />
+                <MetricCard small label="Analyses Run" value={(apiAnalysesRun ?? history.length).toString()} color={DS.colors.blue} />
+                <MetricCard small label="Undercoding Opportunities" value={(apiUndercoding ?? 0).toString()} color={DS.colors.warn} />
+                <MetricCard small label="Accepted Suggestions" value={(apiAccepted ?? reviewedCases.length).toString()} color={DS.colors.vital} />
+                <MetricCard small label="Overrides" value={(apiOverrides ?? 0).toString()} color={DS.colors.textMuted} />
+              </div>
+              <div style={{ marginTop: "10px", fontSize: "12px", color: DS.colors.textMuted }}>
+                Estimated revenue captured: <span style={{ color: DS.colors.vital }}>${Number(apiRevenueCaptured ?? 0).toFixed(2)}</span>
+                {dashboardMetricsLoading && <span style={{ marginLeft: "8px", color: DS.colors.textDim }}>Refreshing...</span>}
+              </div>
+              {apiTopGaps.length > 0 && (
+                <div style={{ marginTop: "8px", fontSize: "12px", color: DS.colors.textMuted }}>
+                  Top documentation gap: {apiTopGaps[0]?.gap} ({apiTopGaps[0]?.count})
+                </div>
+              )}
+              <div style={{ marginTop: "8px", fontSize: "12px", color: DS.colors.textMuted }}>
+                Local agreement (reviewed cases): <span style={{ color: agreementRate >= 80 ? DS.colors.vital : DS.colors.warn }}>{agreementRate}%</span>
               </div>
               <div style={{ marginTop: "10px", fontSize: "12px", color: qualityGate.canFinalize ? DS.colors.vital : DS.colors.warn }}>
                 Finalize gate: {qualityGate.canFinalize ? "Clear" : `Blocked (${qualityGate.hardStops.length} hard-stop)`}

@@ -6780,6 +6780,7 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [queueInput, setQueueInput] = useState("");
   const [queueItems, setQueueItems] = useState([]);
   const [currentQueueId, setCurrentQueueId] = useState(null);
+  const [analyzingQueue, setAnalyzingQueue] = useState(false);
 
   const copyText = async (label, text) => {
     if (!text) return;
@@ -6912,23 +6913,26 @@ const RevenueCaptureTool = ({ onBack }) => {
     }
   };
 
-  const runAnalysis = async () => {
-    if (!note.trim()) {
+  const runAnalysis = async (noteOverride = null, queueIdOverride = null, autoAdvance = true, manageLoading = true) => {
+    const effectiveNote = typeof noteOverride === "string" ? noteOverride : note;
+    const queueTargetId = queueIdOverride || currentQueueId;
+
+    if (!effectiveNote.trim()) {
       setCopied("Paste an encounter note first");
       setTimeout(() => setCopied(""), 1400);
-      return;
+      return false;
     }
     if (!isSupabaseConfigured()) {
       setError("Coding analysis service is not configured.");
-      return;
+      return false;
     }
 
-    setAnalyzing(true);
+    if (manageLoading) setAnalyzing(true);
     setError(null);
 
     try {
       const { data, error: invokeError } = await supabase.functions.invoke("analyze-encounter", {
-        body: { note, billedCode, specialty },
+        body: { note: effectiveNote, billedCode, specialty },
       });
 
       if (invokeError) throw invokeError;
@@ -6968,16 +6972,16 @@ const RevenueCaptureTool = ({ onBack }) => {
       });
       setHistory((prev) => [mapped, ...prev.filter((p) => p.id !== mapped.id)].slice(0, 20));
 
-      if (currentQueueId) {
+      if (queueTargetId) {
         let nextQueueId = null;
         let nextQueueText = "";
         setQueueItems((prev) => {
           const updated = prev.map((item) => (
-            item.id === currentQueueId
+            item.id === queueTargetId
               ? { ...item, status: "done", result: `${mapped.billedCode}->${mapped.suggestedCode}` }
               : item
           ));
-          const currentIndex = updated.findIndex((item) => item.id === currentQueueId);
+          const currentIndex = updated.findIndex((item) => item.id === queueTargetId);
           const pendingAfter = updated.slice(currentIndex + 1).find((item) => item.status === "pending");
           const fallbackPending = updated.find((item) => item.status === "pending");
           const nextItem = pendingAfter || fallbackPending || null;
@@ -6987,13 +6991,17 @@ const RevenueCaptureTool = ({ onBack }) => {
           }
           return updated;
         });
-        setCurrentQueueId(nextQueueId);
-        if (nextQueueText) setNote(nextQueueText);
+        if (autoAdvance) {
+          setCurrentQueueId(nextQueueId);
+          if (nextQueueText) setNote(nextQueueText);
+        }
       }
+      return true;
     } catch (err) {
       setError(err.message || "Analysis failed. Please try again.");
+      return false;
     } finally {
-      setAnalyzing(false);
+      if (manageLoading) setAnalyzing(false);
     }
   };
 
@@ -7048,6 +7056,30 @@ const RevenueCaptureTool = ({ onBack }) => {
     setQueueItems([]);
     setCurrentQueueId(null);
     setQueueInput("");
+  };
+
+  const analyzeAllQueue = async () => {
+    if (analyzingQueue) return;
+    const pending = queueItems.filter((item) => item.status === "pending");
+    if (pending.length === 0) return;
+
+    setAnalyzingQueue(true);
+    setAnalyzing(true);
+    setError(null);
+
+    let successCount = 0;
+    for (const item of pending) {
+      setCurrentQueueId(item.id);
+      setNote(item.text);
+      const ok = await runAnalysis(item.text, item.id, false, false);
+      if (ok) successCount += 1;
+    }
+
+    setCurrentQueueId(null);
+    setAnalyzing(false);
+    setAnalyzingQueue(false);
+    setCopied(`Queue complete: ${successCount}/${pending.length} analyzed`);
+    setTimeout(() => setCopied(""), 1800);
   };
 
   const handleFinalizeEncounter = async () => {
@@ -7259,6 +7291,9 @@ const RevenueCaptureTool = ({ onBack }) => {
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
             <Button small onClick={loadQueue}>Load Queue</Button>
             <Button small onClick={clearQueue}>Clear Queue</Button>
+            <Button small onClick={analyzeAllQueue} style={{ opacity: analyzingQueue || queuePendingCount === 0 ? 0.6 : 1 }}>
+              {analyzingQueue ? "Analyzing Queue..." : "Analyze All Pending"}
+            </Button>
             <span style={{ fontSize: "12px", color: DS.colors.textMuted }}>
               Pending: {queuePendingCount} · Done: {queueDoneCount}
             </span>

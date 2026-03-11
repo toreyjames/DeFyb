@@ -6781,6 +6781,8 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [queueItems, setQueueItems] = useState([]);
   const [currentQueueId, setCurrentQueueId] = useState(null);
   const [analyzingQueue, setAnalyzingQueue] = useState(false);
+  const [queueStopRequested, setQueueStopRequested] = useState(false);
+  const queueStopRef = useRef(false);
 
   const copyText = async (label, text) => {
     if (!text) return;
@@ -7044,6 +7046,8 @@ const RevenueCaptureTool = ({ onBack }) => {
       }));
 
     setQueueItems(parsed);
+    queueStopRef.current = false;
+    setQueueStopRequested(false);
     if (parsed.length > 0) {
       setCurrentQueueId(parsed[0].id);
       setNote(parsed[0].text);
@@ -7056,6 +7060,14 @@ const RevenueCaptureTool = ({ onBack }) => {
     setQueueItems([]);
     setCurrentQueueId(null);
     setQueueInput("");
+    queueStopRef.current = false;
+    setQueueStopRequested(false);
+  };
+
+  const requestStopQueue = () => {
+    if (!analyzingQueue) return;
+    queueStopRef.current = true;
+    setQueueStopRequested(true);
   };
 
   const analyzeAllQueue = async () => {
@@ -7063,12 +7075,15 @@ const RevenueCaptureTool = ({ onBack }) => {
     const pending = queueItems.filter((item) => item.status === "pending");
     if (pending.length === 0) return;
 
+    queueStopRef.current = false;
+    setQueueStopRequested(false);
     setAnalyzingQueue(true);
     setAnalyzing(true);
     setError(null);
 
     let successCount = 0;
     for (const item of pending) {
+      if (queueStopRef.current) break;
       setCurrentQueueId(item.id);
       setNote(item.text);
       const ok = await runAnalysis(item.text, item.id, false, false);
@@ -7078,7 +7093,13 @@ const RevenueCaptureTool = ({ onBack }) => {
     setCurrentQueueId(null);
     setAnalyzing(false);
     setAnalyzingQueue(false);
-    setCopied(`Queue complete: ${successCount}/${pending.length} analyzed`);
+    const stopped = queueStopRef.current;
+    setCopied(stopped
+      ? `Queue stopped: ${successCount}/${pending.length} analyzed`
+      : `Queue complete: ${successCount}/${pending.length} analyzed`
+    );
+    queueStopRef.current = false;
+    setQueueStopRequested(false);
     setTimeout(() => setCopied(""), 1800);
   };
 
@@ -7294,6 +7315,11 @@ const RevenueCaptureTool = ({ onBack }) => {
             <Button small onClick={analyzeAllQueue} style={{ opacity: analyzingQueue || queuePendingCount === 0 ? 0.6 : 1 }}>
               {analyzingQueue ? "Analyzing Queue..." : "Analyze All Pending"}
             </Button>
+            {analyzingQueue && (
+              <Button small onClick={requestStopQueue} style={{ background: DS.colors.warn, border: "none", color: "#111" }}>
+                {queueStopRequested ? "Stopping..." : "Stop Queue"}
+              </Button>
+            )}
             <span style={{ fontSize: "12px", color: DS.colors.textMuted }}>
               Pending: {queuePendingCount} · Done: {queueDoneCount}
             </span>

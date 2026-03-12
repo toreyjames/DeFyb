@@ -5441,6 +5441,8 @@ const TeamDashboard = ({ onBack }) => {
   const [modalType, setModalType] = useState(null); // 'baseline', 'implementation', 'golive', 'metrics', 'quote'
   const [selectedQuote, setSelectedQuote] = useState(null);
   const [pipelineFocus, setPipelineFocus] = useState("all");
+  const [claimRequests, setClaimRequests] = useState([]);
+  const [claimLoading, setClaimLoading] = useState(false);
 
   const refreshPractices = async () => {
     if (!isSupabaseConfigured()) return;
@@ -5459,6 +5461,43 @@ const TeamDashboard = ({ onBack }) => {
       }
     } catch (err) {
       console.error('Refresh error:', err);
+    }
+  };
+
+  const refreshClaimRequests = async () => {
+    if (!isSupabaseConfigured()) return;
+    try {
+      setClaimLoading(true);
+      const { data, error } = await supabase
+        .from("clinic_claim_requests")
+        .select("id, clinic_name, owner_email, requester_email, requester_name, notes, status, source, submitted_at")
+        .order("submitted_at", { ascending: false })
+        .limit(12);
+      if (error) throw error;
+      setClaimRequests(data || []);
+    } catch (err) {
+      console.error("claim request fetch error:", err);
+      setClaimRequests([]);
+    } finally {
+      setClaimLoading(false);
+    }
+  };
+
+  const handleClaimDecision = async (requestId, status) => {
+    if (!isSupabaseConfigured()) return;
+    try {
+      const { error } = await supabase
+        .from("clinic_claim_requests")
+        .update({
+          status,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq("id", requestId);
+      if (error) throw error;
+      await refreshClaimRequests();
+    } catch (err) {
+      console.error("claim request update error:", err);
+      alert(`Failed to ${status} claim request.`);
     }
   };
 
@@ -5623,6 +5662,7 @@ const TeamDashboard = ({ onBack }) => {
     };
 
     fetchPractices();
+    refreshClaimRequests();
   }, []);
 
   const views = [
@@ -5740,6 +5780,71 @@ const TeamDashboard = ({ onBack }) => {
             color={DS.colors.shock}
           />
         </div>
+
+        <Card style={{ marginBottom: "20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+            <div style={{ fontWeight: 600, fontSize: "13px" }}>Clinic Claim Requests</div>
+            <Button small onClick={refreshClaimRequests} style={{ opacity: claimLoading ? 0.7 : 1 }}>
+              {claimLoading ? "Refreshing..." : "Refresh"}
+            </Button>
+          </div>
+          {claimRequests.length === 0 ? (
+            <div style={{ fontSize: "12px", color: DS.colors.textMuted }}>
+              No claim requests yet.
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: "8px" }}>
+              {claimRequests.map((req) => (
+                <div key={req.id} style={{
+                  border: `1px solid ${DS.colors.border}`,
+                  borderRadius: DS.radius.sm,
+                  background: DS.colors.bg,
+                  padding: "10px 12px",
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto",
+                  gap: "10px",
+                }}>
+                  <div>
+                    <div style={{ fontSize: "13px", fontWeight: 600 }}>{req.clinic_name}</div>
+                    <div style={{ fontSize: "12px", color: DS.colors.textMuted }}>
+                      Owner: {req.owner_email} · Requester: {req.requester_name || req.requester_email || "unknown"}
+                    </div>
+                    {req.notes && (
+                      <div style={{ fontSize: "12px", color: DS.colors.textDim, marginTop: "4px" }}>{req.notes}</div>
+                    )}
+                    <div style={{ fontSize: "11px", color: DS.colors.textDim, marginTop: "4px" }}>
+                      {new Date(req.submitted_at).toLocaleString()} · {req.source}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <span style={{
+                      fontSize: "11px",
+                      padding: "4px 8px",
+                      borderRadius: "999px",
+                      background: req.status === "approved" ? DS.colors.vitalDim : req.status === "rejected" ? DS.colors.dangerDim : DS.colors.warnDim,
+                      color: req.status === "approved" ? DS.colors.vital : req.status === "rejected" ? DS.colors.danger : DS.colors.warn,
+                      textTransform: "uppercase",
+                      fontWeight: 700,
+                      letterSpacing: "0.06em",
+                    }}>
+                      {req.status}
+                    </span>
+                    {req.status === "pending" && (
+                      <>
+                        <Button small onClick={() => handleClaimDecision(req.id, "approved")} style={{ background: DS.colors.vital, border: "none", color: "#fff" }}>
+                          Approve
+                        </Button>
+                        <Button small onClick={() => handleClaimDecision(req.id, "rejected")} style={{ background: DS.colors.danger, border: "none", color: "#fff" }}>
+                          Reject
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
 
         {/* VIEW TOGGLE */}
         <div style={{ display: "flex", gap: "4px", marginBottom: "24px" }}>

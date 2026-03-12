@@ -5506,6 +5506,11 @@ const TeamDashboard = ({ onBack }) => {
             requesterEmail: target.requester_email || null,
           },
         }).catch(() => {});
+        if (status === "approved") {
+          supabase.functions.invoke("clinic-claim-activate", {
+            body: { claimRequestId: target.id },
+          }).catch(() => {});
+        }
       }
       await refreshClaimRequests();
     } catch (err) {
@@ -6972,6 +6977,7 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
   const [showQueuePanel, setShowQueuePanel] = useState(false);
   const [showAdvancedReview, setShowAdvancedReview] = useState(false);
   const draftStorageKey = "defyb:encounter-note-draft:v1";
+  const activationSyncRef = useRef(false);
   const effectiveDemoMode = demoMode || !isSupabaseConfigured();
   const hasPaidWorkspace = Boolean(
     billingProfile?.stripe_subscription_id
@@ -7208,6 +7214,11 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
         body: { claimRequestId: data?.id },
       });
       if (reviewResult?.autoApproved) {
+        if (data?.id) {
+          supabase.functions.invoke("clinic-claim-activate", {
+            body: { claimRequestId: data.id },
+          }).catch(() => {});
+        }
         setClaimRequest((prev) => prev ? ({
           ...prev,
           status: "approved",
@@ -7303,6 +7314,26 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
   useEffect(() => {
     loadDashboardMetrics();
   }, [effectiveDemoMode]);
+
+  useEffect(() => {
+    if (effectiveDemoMode) return;
+    if (activationSyncRef.current) return;
+    if (!claimRequest?.id) return;
+    if (String(claimRequest.status || "").toLowerCase() !== "approved") return;
+    if (billingProfile?.billing_status && String(billingProfile.billing_status).toLowerCase() !== "none") return;
+    activationSyncRef.current = true;
+    supabase.functions.invoke("clinic-claim-activate", {
+      body: { claimRequestId: claimRequest.id },
+    }).then(async () => {
+      const { data } = await supabase
+        .from("billing_profiles")
+        .select("billing_status, plan_code, implementation_enabled, monthly_amount, stripe_subscription_id, licensed_provider_count, active_provider_count")
+        .maybeSingle();
+      if (data) setBillingProfile(data);
+    }).catch(() => {
+      activationSyncRef.current = false;
+    });
+  }, [effectiveDemoMode, claimRequest?.id, claimRequest?.status, billingProfile?.billing_status]);
 
   const runAnalysis = async (noteOverride = null, queueIdOverride = null, autoAdvance = true, manageLoading = true) => {
     const effectiveNote = typeof noteOverride === "string" ? noteOverride : note;
@@ -7508,6 +7539,10 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
   const apiUndercoding = dashboardMetrics?.undercoding_opportunities_detected ?? null;
   const apiRevenueCaptured = dashboardMetrics?.estimated_revenue_captured ?? null;
   const apiTopGaps = dashboardMetrics?.top_documentation_gaps || [];
+  const analysesForPrompts = Number(apiAnalysesRun ?? history.length ?? 0);
+  const estimatedLiftForPrompts = Number(apiRevenueCaptured ?? 0);
+  const shouldPromptStartSubscription = !effectiveDemoMode && !billingProfile?.stripe_subscription_id && analysesForPrompts >= 3;
+  const shouldPromptFirstWin = !effectiveDemoMode && analysesForPrompts >= 1 && estimatedLiftForPrompts > 0;
   const versionStats = Object.values(history.reduce((acc, item) => {
     const key = item.modelVersion || "rules-v1.0";
     if (!acc[key]) {
@@ -7921,6 +7956,31 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
             >
               Create account →
             </span>
+          </div>
+        )}
+        {(shouldPromptStartSubscription || shouldPromptFirstWin) && (
+          <div style={{
+            marginBottom: "12px",
+            padding: "10px 12px",
+            borderRadius: DS.radius.md,
+            border: `1px solid ${DS.colors.vital}`,
+            background: DS.colors.vitalDim,
+            fontSize: "12px",
+            color: DS.colors.text,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "10px",
+            flexWrap: "wrap",
+          }}>
+            <span>
+              {shouldPromptStartSubscription
+                ? `You ran ${analysesForPrompts} analyses. Activate billing now to keep capturing underbilling across all providers.`
+                : `First revenue signal detected: $${estimatedLiftForPrompts.toFixed(2)} estimated captured. Keep this running clinic-wide.`}
+            </span>
+            <Button small primary onClick={() => setShowBillingPanel(true)}>
+              {shouldPromptStartSubscription ? "Activate Subscription" : "Open Billing Setup"}
+            </Button>
           </div>
         )}
         <div style={{ marginBottom: "12px", display: "flex", gap: "8px", flexWrap: "wrap" }}>

@@ -5443,6 +5443,16 @@ const TeamDashboard = ({ onBack }) => {
   const [pipelineFocus, setPipelineFocus] = useState("all");
   const [claimRequests, setClaimRequests] = useState([]);
   const [claimLoading, setClaimLoading] = useState(false);
+  const [teamUsers, setTeamUsers] = useState([]);
+  const [membershipRows, setMembershipRows] = useState([]);
+  const [membershipLoading, setMembershipLoading] = useState(false);
+  const [membershipSaving, setMembershipSaving] = useState(false);
+  const [selectedMembershipUserId, setSelectedMembershipUserId] = useState("");
+  const [selectedMembershipPracticeId, setSelectedMembershipPracticeId] = useState("");
+  const [membershipRole, setMembershipRole] = useState("provider");
+  const [membershipStatus, setMembershipStatus] = useState("active");
+  const [membershipDefault, setMembershipDefault] = useState(false);
+  const [membershipNotice, setMembershipNotice] = useState("");
 
   const refreshPractices = async () => {
     if (!isSupabaseConfigured()) return;
@@ -5480,6 +5490,91 @@ const TeamDashboard = ({ onBack }) => {
       setClaimRequests([]);
     } finally {
       setClaimLoading(false);
+    }
+  };
+
+  const refreshTeamUsers = async () => {
+    if (!isSupabaseConfigured()) return;
+    try {
+      const { data, error } = await supabase
+        .from("app_users")
+        .select("auth_user_id, email")
+        .not("auth_user_id", "is", null)
+        .order("email", { ascending: true });
+      if (error) throw error;
+      const deduped = [];
+      const seen = new Set();
+      (data || []).forEach((row) => {
+        const id = row.auth_user_id;
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        deduped.push({ auth_user_id: id, email: row.email || "unknown" });
+      });
+      setTeamUsers(deduped);
+      if (!selectedMembershipUserId && deduped.length > 0) setSelectedMembershipUserId(deduped[0].auth_user_id);
+    } catch (err) {
+      console.error("team user fetch error:", err);
+      setTeamUsers([]);
+    }
+  };
+
+  const refreshMembershipRows = async (userId = selectedMembershipUserId) => {
+    if (!isSupabaseConfigured() || !userId) {
+      setMembershipRows([]);
+      return;
+    }
+    try {
+      setMembershipLoading(true);
+      const { data, error } = await supabase
+        .from("clinic_memberships")
+        .select("id, auth_user_id, practice_id, clinic_name, role, status, is_default, updated_at")
+        .eq("auth_user_id", userId)
+        .order("is_default", { ascending: false });
+      if (error) throw error;
+      setMembershipRows(data || []);
+    } catch (err) {
+      console.error("membership fetch error:", err);
+      setMembershipRows([]);
+    } finally {
+      setMembershipLoading(false);
+    }
+  };
+
+  const saveMembership = async () => {
+    if (!isSupabaseConfigured()) return;
+    if (!selectedMembershipUserId || !selectedMembershipPracticeId) {
+      setMembershipNotice("Select user and clinic first.");
+      return;
+    }
+    setMembershipSaving(true);
+    setMembershipNotice("");
+    try {
+      const selectedPractice = practices.find((p) => p.id === selectedMembershipPracticeId);
+      if (membershipDefault) {
+        await supabase
+          .from("clinic_memberships")
+          .update({ is_default: false })
+          .eq("auth_user_id", selectedMembershipUserId);
+      }
+      const { error } = await supabase
+        .from("clinic_memberships")
+        .upsert({
+          auth_user_id: selectedMembershipUserId,
+          practice_id: selectedMembershipPracticeId,
+          clinic_name: selectedPractice?.name || "Clinic",
+          role: membershipRole,
+          status: membershipStatus,
+          is_default: membershipDefault,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "auth_user_id,practice_id" });
+      if (error) throw error;
+      await refreshMembershipRows(selectedMembershipUserId);
+      setMembershipNotice("Membership saved.");
+    } catch (err) {
+      console.error("membership save error:", err);
+      setMembershipNotice("Could not save membership.");
+    } finally {
+      setMembershipSaving(false);
     }
   };
 
@@ -5681,7 +5776,12 @@ const TeamDashboard = ({ onBack }) => {
 
     fetchPractices();
     refreshClaimRequests();
+    refreshTeamUsers();
   }, []);
+
+  useEffect(() => {
+    refreshMembershipRows(selectedMembershipUserId);
+  }, [selectedMembershipUserId]);
 
   const views = [
     { key: "pipeline", label: "Pipeline" },
@@ -5862,6 +5962,95 @@ const TeamDashboard = ({ onBack }) => {
               ))}
             </div>
           )}
+        </Card>
+
+        <Card style={{ marginBottom: "20px" }}>
+          <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "10px" }}>Clinic Memberships</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "8px" }}>
+            <select
+              value={selectedMembershipUserId}
+              onChange={(e) => setSelectedMembershipUserId(e.target.value)}
+              style={{ padding: "8px 10px", borderRadius: DS.radius.sm, border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bgCard, color: DS.colors.text, fontSize: "12px" }}
+            >
+              <option value="">Select user</option>
+              {teamUsers.map((u) => (
+                <option key={u.auth_user_id} value={u.auth_user_id}>{u.email}</option>
+              ))}
+            </select>
+            <select
+              value={selectedMembershipPracticeId}
+              onChange={(e) => setSelectedMembershipPracticeId(e.target.value)}
+              style={{ padding: "8px 10px", borderRadius: DS.radius.sm, border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bgCard, color: DS.colors.text, fontSize: "12px" }}
+            >
+              <option value="">Select clinic</option>
+              {practices.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <select
+              value={membershipRole}
+              onChange={(e) => setMembershipRole(e.target.value)}
+              style={{ padding: "8px 10px", borderRadius: DS.radius.sm, border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bgCard, color: DS.colors.text, fontSize: "12px" }}
+            >
+              <option value="owner">owner</option>
+              <option value="admin">admin</option>
+              <option value="office_manager">office_manager</option>
+              <option value="provider">provider</option>
+              <option value="reviewer">reviewer</option>
+            </select>
+            <select
+              value={membershipStatus}
+              onChange={(e) => setMembershipStatus(e.target.value)}
+              style={{ padding: "8px 10px", borderRadius: DS.radius.sm, border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bgCard, color: DS.colors.text, fontSize: "12px" }}
+            >
+              <option value="active">active</option>
+              <option value="pending">pending</option>
+              <option value="inactive">inactive</option>
+            </select>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: DS.colors.textMuted }}>
+              <input
+                type="checkbox"
+                checked={membershipDefault}
+                onChange={(e) => setMembershipDefault(e.target.checked)}
+              />
+              Set as default clinic
+            </label>
+            <Button small primary onClick={saveMembership} style={{ opacity: membershipSaving ? 0.7 : 1 }}>
+              {membershipSaving ? "Saving..." : "Add / Update Membership"}
+            </Button>
+            <Button small onClick={() => refreshMembershipRows(selectedMembershipUserId)} style={{ opacity: membershipLoading ? 0.7 : 1 }}>
+              {membershipLoading ? "Loading..." : "Refresh User Memberships"}
+            </Button>
+            {membershipNotice && <span style={{ fontSize: "12px", color: DS.colors.textMuted }}>{membershipNotice}</span>}
+          </div>
+          <div style={{ marginTop: "10px", display: "grid", gap: "6px" }}>
+            {membershipRows.length === 0 ? (
+              <div style={{ fontSize: "12px", color: DS.colors.textDim }}>
+                No memberships for selected user.
+              </div>
+            ) : (
+              membershipRows.map((row) => (
+                <div key={row.id} style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto auto auto",
+                  gap: "8px",
+                  alignItems: "center",
+                  fontSize: "12px",
+                  background: DS.colors.bg,
+                  border: `1px solid ${DS.colors.border}`,
+                  borderRadius: DS.radius.sm,
+                  padding: "8px 10px",
+                }}>
+                  <span>{row.clinic_name || `Clinic ${String(row.practice_id).slice(0, 8)}`}</span>
+                  <span style={{ color: DS.colors.textMuted }}>{row.role}</span>
+                  <span style={{ color: row.status === "active" ? DS.colors.vital : DS.colors.warn }}>{row.status}</span>
+                  <span style={{ color: row.is_default ? DS.colors.shock : DS.colors.textDim }}>{row.is_default ? "default" : ""}</span>
+                </div>
+              ))
+            )}
+          </div>
         </Card>
 
         {/* VIEW TOGGLE */}

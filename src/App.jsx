@@ -7202,9 +7202,35 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
           notes: payload.notes,
         },
       }).catch(() => {});
+
+      // Fast auto-review: low-risk requests get immediate approval.
+      const { data: reviewResult } = await supabase.functions.invoke("clinic-claim-auto-review", {
+        body: { claimRequestId: data?.id },
+      });
+      if (reviewResult?.autoApproved) {
+        setClaimRequest((prev) => prev ? ({
+          ...prev,
+          status: "approved",
+          reviewed_at: new Date().toISOString(),
+        }) : prev);
+        supabase.functions.invoke("clinic-claim-notify", {
+          body: {
+            event: "decision",
+            status: "approved",
+            clinicName: clinicName,
+            ownerEmail: ownerEmail,
+            requesterName: payload.requester_name,
+            requesterEmail: payload.requester_email,
+          },
+        }).catch(() => {});
+        setCopied("Claim auto-approved");
+        setTimeout(() => setCopied(""), 1600);
+      }
       setShowClaimForm(false);
-      setCopied("Claim request sent");
-      setTimeout(() => setCopied(""), 1400);
+      if (!reviewResult?.autoApproved) {
+        setCopied("Claim request sent");
+        setTimeout(() => setCopied(""), 1400);
+      }
     } catch (claimError) {
       const msg = String(claimError?.message || "");
       if (msg.toLowerCase().includes("relation") && msg.toLowerCase().includes("clinic_claim_requests")) {

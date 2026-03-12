@@ -91,37 +91,37 @@ const ConfigProvider = ({ children }) => {
 // --- DESIGN SYSTEM ---
 const DS = {
   colors: {
-    bg: "#0b0c0e",
-    bgCard: "#111318",
-    bgHover: "#181b22",
-    border: "#1e2129",
-    borderLight: "#2a2e38",
-    text: "#e2e4e9",
-    textMuted: "#8b8f9a",
-    textDim: "#5c6070",
-    shock: "#e8762b",       // DeFyb orange — the defibrillator shock
-    shockGlow: "#e8762b33",
-    shockLight: "#f0a66d",
-    vital: "#34d399",       // Green — healthy metrics
-    vitalDim: "#34d39944",
-    warn: "#f59e0b",        // Amber — staffing / attention
-    warnDim: "#f59e0b44",
-    danger: "#ef4444",      // Red — critical
-    dangerDim: "#ef444444",
-    blue: "#60a5fa",        // Cool blue — time metrics
-    blueDim: "#60a5fa44",
+    bg: "#f3f6f9",
+    bgCard: "#ffffff",
+    bgHover: "#edf2f7",
+    border: "#d7dee7",
+    borderLight: "#c3ceda",
+    text: "#1f2a36",
+    textMuted: "#5f6f7f",
+    textDim: "#8694a3",
+    shock: "#2f5d7c",
+    shockGlow: "#2f5d7c1f",
+    shockLight: "#6b8ba4",
+    vital: "#2e7d5b",
+    vitalDim: "#2e7d5b1f",
+    warn: "#a66d18",
+    warnDim: "#a66d181f",
+    danger: "#b54747",
+    dangerDim: "#b547471f",
+    blue: "#3f6d8d",
+    blueDim: "#3f6d8d1f",
     white: "#ffffff",
   },
   fonts: {
-    display: "'Instrument Serif', Georgia, serif",
-    body: "'Outfit', 'Segoe UI', sans-serif",
-    mono: "'JetBrains Mono', 'Fira Code', monospace",
+    display: "'Lora', Georgia, serif",
+    body: "'Source Sans 3', 'Segoe UI', sans-serif",
+    mono: "'IBM Plex Mono', monospace",
   },
   radius: { sm: "6px", md: "10px", lg: "16px", xl: "24px" },
   shadow: {
-    card: "0 1px 3px rgba(0,0,0,0.4)",
-    glow: "0 0 40px rgba(232,118,43,0.15)",
-    deep: "0 8px 32px rgba(0,0,0,0.5)",
+    card: "0 6px 20px rgba(26, 39, 54, 0.06)",
+    glow: "0 0 30px rgba(47, 93, 124, 0.12)",
+    deep: "0 12px 36px rgba(26, 39, 54, 0.1)",
   },
 };
 
@@ -135,7 +135,7 @@ const TAGS = {
 // --- FONTS LOADER ---
 const FontLoader = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
   `}</style>
 );
 
@@ -144,7 +144,13 @@ const GlobalStyles = () => (
   <style>{`
     * { margin:0; padding:0; box-sizing:border-box; }
     html { scroll-behavior:smooth; }
-    body { background:${DS.colors.bg}; color:${DS.colors.text}; font-family:${DS.fonts.body}; line-height:1.6; -webkit-font-smoothing:antialiased; }
+    body {
+      background: linear-gradient(180deg, #f9fbfd 0%, ${DS.colors.bg} 180px, ${DS.colors.bg} 100%);
+      color:${DS.colors.text};
+      font-family:${DS.fonts.body};
+      line-height:1.6;
+      -webkit-font-smoothing:antialiased;
+    }
     ::selection { background:${DS.colors.shock}; color:#fff; }
     ::-webkit-scrollbar { width:6px; }
     ::-webkit-scrollbar-track { background:${DS.colors.bg}; }
@@ -244,10 +250,10 @@ const Button = ({ children, primary, small, onClick, style: s = {} }) => (
     padding: small ? "8px 16px" : "12px 28px",
     background: primary ? DS.colors.shock : "transparent",
     color: primary ? "#fff" : DS.colors.text,
-    border: primary ? "none" : `1px solid ${DS.colors.borderLight}`,
+    border: `1px solid ${primary ? DS.colors.shock : DS.colors.borderLight}`,
     borderRadius: DS.radius.md, cursor: "pointer",
     fontFamily: DS.fonts.body, fontSize: small ? "13px" : "15px",
-    fontWeight: 500, letterSpacing: "0.01em",
+    fontWeight: 600, letterSpacing: "0.005em",
     transition: "all 0.2s ease", ...s,
   }}>{children}</button>
 );
@@ -255,7 +261,7 @@ const Button = ({ children, primary, small, onClick, style: s = {} }) => (
 const Card = ({ children, style: s = {} }) => (
   <div style={{
     background: DS.colors.bgCard, border: `1px solid ${DS.colors.border}`,
-    borderRadius: DS.radius.lg, padding: "24px", ...s,
+    borderRadius: DS.radius.lg, padding: "24px", boxShadow: DS.shadow.card, ...s,
   }}>{children}</div>
 );
 
@@ -573,7 +579,7 @@ const STAGES = [
   { key: "managed", label: "Managed", color: DS.colors.vital },
 ];
 
-// Predefined AI tools for implementation
+// Predefined tools for implementation
 const AI_TOOLS = [
   { id: "coding_core", name: "DeFyb Coding Core", category: "revenue", cost: 299 },
   { id: "suki", name: "Suki AI Scribe", category: "scribe", cost: 299 },
@@ -637,7 +643,7 @@ const EMAIL_TEMPLATES = {
   quote_followup_3: { subject: "Last Chance: Your DeFyb Quote Expires Soon", trigger: "quote_no_response", delay: 10 },
   payment_received: { subject: "Payment Received - Thank You!", trigger: "payment_succeeded" },
   stage_change: { subject: "Update on Your DeFyb Transformation", trigger: "stage_change" },
-  tool_deployed: { subject: "New AI Tool Now Live!", trigger: "tool_active" },
+  tool_deployed: { subject: "New Tool Now Live!", trigger: "tool_active" },
   scorecard: { subject: "Your Monthly Practice Scorecard", trigger: "monthly" },
   invoice_due: { subject: "Payment Reminder: Invoice Due Soon", trigger: "invoice_due", delay: -3 },
   invoice_overdue_1: { subject: "Payment Overdue - Action Required", trigger: "invoice_overdue", delay: 1 },
@@ -860,11 +866,11 @@ const calculateROIProjection = (practice) => {
         name: "Assessment Only",
         description: "Baseline capture, ROI analysis, and transformation roadmap",
         price: quote.assessmentFee,
-        includes: ["Half-day on-site assessment", "AI environment audit", "Detailed ROI projection", "Implementation roadmap", "No commitment to proceed"],
+        includes: ["Half-day on-site assessment", "workflow and revenue baseline", "Detailed ROI projection", "Implementation roadmap", "No commitment to proceed"],
       },
       {
         name: "Assessment + Implementation",
-        description: "Full deployment of recommended AI stack",
+        description: "Full deployment of recommended tool stack",
         price: quote.assessmentFee + quote.implementationFee,
         includes: ["Everything in Assessment", "Tool deployment & configuration", "Staff training", "Go-live support", "30-day optimization period"],
       },
@@ -1077,7 +1083,7 @@ const QuoteBuilder = ({ practice, onSave, onCancel }) => {
           </div>
 
           <div style={{ marginBottom: "16px" }}>
-            <label style={labelStyle}>AI Tools {config?.source === "edge-config" && <span style={{ fontSize: "9px", color: DS.colors.vital }}>(LIVE)</span>}</label>
+            <label style={labelStyle}>Tools {config?.source === "edge-config" && <span style={{ fontSize: "9px", color: DS.colors.vital }}>(LIVE)</span>}</label>
             <div style={{ display: "grid", gap: "6px" }}>
               {dynamicTools.map((tool) => (
                 <label
@@ -1746,7 +1752,7 @@ const generateScorecardPDF = async (practice) => {
     { label: "Stage", value: (practice.stage || "managed").charAt(0).toUpperCase() + (practice.stage || "managed").slice(1) },
     { label: "Providers", value: practice.providers || practice.provider_count || "?" },
     { label: "Go-Live Date", value: practice.go_live_date ? new Date(practice.go_live_date).toLocaleDateString() : "N/A" },
-    { label: "AI Tools Active", value: (practice.ai_stack || practice.stack || []).filter(t => t.status === "active").length.toString() },
+    { label: "Tools Active", value: (practice.ai_stack || practice.stack || []).filter(t => t.status === "active").length.toString() },
   ];
 
   doc.setFontSize(9);
@@ -1866,7 +1872,7 @@ const generateScorecardPDF = async (practice) => {
   y += 50;
   doc.setFontSize(14);
   doc.setTextColor(40, 40, 40);
-  doc.text("AI Stack Status", 20, y);
+  doc.text("Tool Stack Status", 20, y);
   y += 10;
 
   const stack = practice.ai_stack || practice.stack || [];
@@ -1874,7 +1880,7 @@ const generateScorecardPDF = async (practice) => {
 
   if (stack.length === 0) {
     doc.setTextColor(...gray);
-    doc.text("No AI tools deployed yet", 20, y);
+    doc.text("No tools deployed yet", 20, y);
   } else {
     stack.forEach((tool) => {
       const statusColor = tool.status === "active" ? green : tool.status === "deploying" ? [245, 158, 11] : gray;
@@ -2004,7 +2010,7 @@ const generateProposalPDF = async (proposal) => {
 
   doc.setFontSize(18);
   doc.setTextColor(232, 118, 43);
-  doc.text("Recommended AI Stack", 20, 25);
+  doc.text("Recommended Tool Stack", 20, 25);
 
   doc.setFontSize(10);
   doc.setTextColor(100);
@@ -2149,7 +2155,7 @@ const generateProposalPDF = async (proposal) => {
   doc.text("Next Steps", 20, 25);
 
   const steps = [
-    { num: "1", title: "Schedule Assessment", desc: "Half-day on-site to capture baseline metrics and conduct AI environment audit." },
+    { num: "1", title: "Schedule Assessment", desc: "Half-day on-site to capture baseline metrics and conduct workflow and revenue baseline." },
     { num: "2", title: "Review Roadmap", desc: "We'll present findings and a detailed implementation plan within 72 hours." },
     { num: "3", title: "Begin Transformation", desc: "Start with Tuesday Transform - one day/week on the new stack to prove results." },
     { num: "4", title: "Scale & Optimize", desc: "Expand to full deployment and ongoing managed optimization." },
@@ -2233,7 +2239,7 @@ const ProposalGenerator = ({ practice, onClose }) => {
       {/* Recommended Tools */}
       <div style={{ marginBottom: "24px" }}>
         <h4 style={{ fontSize: "14px", textTransform: "uppercase", letterSpacing: "0.06em", color: DS.colors.textMuted, marginBottom: "12px" }}>
-          Recommended AI Stack
+          Recommended Tool Stack
         </h4>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
           {proposal.recommendedTools.map((tool) => (
@@ -2838,8 +2844,8 @@ const calculateBaselineROI = (form, practice) => {
   const workDays = 250;
   const providerHourlyValue = 200;
 
-  // Time savings from AI scribe
-  const docTimeSaved = Math.max(0, docTimeBaseline - 3); // Assume 3 min with AI
+  // Time savings from scribe
+  const docTimeSaved = Math.max(0, docTimeBaseline - 3); // Assume 3 min with the tool
   const timeSavedMinPerDay = docTimeSaved * patientsPerDay;
   const timeSavedHoursPerYear = (timeSavedMinPerDay / 60) * workDays * providerCount;
   const timeSavedAnnualValue = timeSavedHoursPerYear * providerHourlyValue;
@@ -2911,9 +2917,9 @@ const PilotTracker = ({ practice, onSave, onCancel }) => {
   const [error, setError] = useState(null);
 
   const weeks = [
-    { key: "week1", label: "Week 1: Scribe Selection", color: DS.colors.blue, description: "Choose and set up ambient AI scribe" },
+    { key: "week1", label: "Week 1: Scribe Selection", color: DS.colors.blue, description: "Choose and set up ambient scribe" },
     { key: "week2", label: "Week 2: EHR Integration", color: DS.colors.warn, description: "Connect scribe to EHR, configure templates" },
-    { key: "week3", label: "Week 3: Full-Day Pilot", color: DS.colors.vital, description: "Run full day with AI, measure results" },
+    { key: "week3", label: "Week 3: Full-Day Pilot", color: DS.colors.vital, description: "Run full day with the tool, measure results" },
     { key: "week4", label: "Week 4: Coding Analysis", color: DS.colors.shock, description: "Analyze coding impact, make go/no-go decision" },
   ];
 
@@ -3235,7 +3241,7 @@ const ImplementationTracker = ({ practice, onSave, onCancel }) => {
 
   const handleSubmit = async () => {
     if (selectedTools.length === 0) {
-      setError("Please select at least one AI tool to deploy");
+      setError("Please select at least one tool to deploy");
       return;
     }
 
@@ -3265,7 +3271,7 @@ const ImplementationTracker = ({ practice, onSave, onCancel }) => {
         user_type: "client",
         type: "stage_change",
         title: "Implementation Started",
-        message: `We're beginning deployment of ${selectedTools.length} AI tool${selectedTools.length > 1 ? "s" : ""} for your practice. You'll be notified as each tool goes live.`,
+        message: `We're beginning deployment of ${selectedTools.length} tool${selectedTools.length > 1 ? "s" : ""} for your practice. You'll be notified as each tool goes live.`,
       });
 
       onSave();
@@ -3280,7 +3286,7 @@ const ImplementationTracker = ({ practice, onSave, onCancel }) => {
   return (
     <div>
       <p style={{ fontSize: "14px", color: DS.colors.textMuted, marginBottom: "24px" }}>
-        Select the AI tools to deploy for this practice. Tools will start with "planned" status and progress through "deploying" to "active".
+        Select the tools to deploy for this practice. Tools will start with "planned" status and progress through "deploying" to "active".
       </p>
 
       <div style={{ display: "grid", gap: "8px", marginBottom: "24px" }}>
@@ -3371,7 +3377,7 @@ const GoLiveForm = ({ practice, onSave, onCancel }) => {
         user_type: "client",
         type: "stage_change",
         title: "You're Live!",
-        message: "Congratulations! Your practice is now live with the full AI stack. Check your portal to see real-time metrics and progress.",
+        message: "Congratulations! Your practice is now live with the full tool stack. Check your portal to see real-time metrics and progress.",
       });
 
       onSave();
@@ -3386,7 +3392,7 @@ const GoLiveForm = ({ practice, onSave, onCancel }) => {
   return (
     <div>
       <p style={{ fontSize: "14px", color: DS.colors.textMuted, marginBottom: "24px" }}>
-        Confirm the go-live date to move this practice to managed status. All AI tools will be marked as active.
+        Confirm the go-live date to move this practice to managed status. All tools will be marked as active.
       </p>
 
       <div style={{ marginBottom: "24px" }}>
@@ -4175,14 +4181,14 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
 
           <div style={{
             marginTop: "24px", padding: "16px 20px", borderRadius: DS.radius.md,
-            background: `${DS.colors.shock}11`, border: `1px solid ${DS.colors.shock}33`,
+            background: `${DS.colors.shock}12`, border: `1px solid ${DS.colors.shock}30`,
             display: "flex", alignItems: "center", gap: "12px",
           }}>
             <span style={{ fontSize: "20px" }}>🔊</span>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "14px" }}>AI Environment Audit — included in every assessment</div>
+              <div style={{ fontWeight: 600, fontSize: "14px" }}>Workflow & Revenue Baseline — included in every assessment</div>
               <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
-                We start with coding capture. DME, prior-auth, and broader automation modules are layered in phase two
+                We start with coding capture. DME, prior-auth, and broader workflow modules are layered in phase two
                 after baseline coding lift is proven.
               </div>
             </div>
@@ -4362,7 +4368,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
 
           <div>
             <div style={{ fontSize: "12px", color: DS.colors.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "16px" }}>
-              AI Tool Partners
+              Tool Partners
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
               {[
@@ -4725,7 +4731,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
               {
                 icon: "🛡️",
                 title: "No PHI Storage",
-                desc: "We track practice metrics, not patient data. AI tools integrate directly with your EHR.",
+                desc: "We track practice metrics, not patient data. tools integrate directly with your EHR.",
               },
               {
                 icon: "🔐",
@@ -4870,13 +4876,13 @@ const getStageMessage = (stage) => {
     case "implementation":
       return {
         title: "Implementation underway",
-        subtitle: "Your AI tools are being deployed. You'll be notified as each tool goes live.",
+        subtitle: "Your tools are being deployed. You'll be notified as each tool goes live.",
         icon: "🚀",
       };
     case "managed":
       return {
         title: "You're live!",
-        subtitle: "Your practice is running on the full AI stack. Track your progress below.",
+        subtitle: "Your practice is running on the full tool stack. Track your progress below.",
         icon: "⚡",
       };
     default:
@@ -5003,7 +5009,7 @@ const ClientPortal = ({ onBack, practiceId: propPracticeId }) => {
     { key: "overview", label: "Overview" },
     ...(hasPilot ? [{ key: "pilot", label: "Pilot Progress" }] : []),
     ...(hasCurrentMetrics ? [{ key: "metrics", label: "Metrics" }] : []),
-    ...(practice.stack?.length > 0 ? [{ key: "stack", label: "AI Stack" }] : []),
+    ...(practice.stack?.length > 0 ? [{ key: "stack", label: "Tool Stack" }] : []),
     { key: "updates", label: "Updates" },
   ];
 
@@ -5101,10 +5107,10 @@ const ClientPortal = ({ onBack, practiceId: propPracticeId }) => {
               </Card>
             )}
 
-            {/* AI Stack Preview */}
+            {/* Tool Stack Preview */}
             {practice.stack?.length > 0 && (
               <Card style={{ marginBottom: "24px" }}>
-                <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "16px" }}>Your AI Stack</div>
+                <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "16px" }}>Your Tool Stack</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                   {practice.stack.map((tool, i) => (
                     <span key={i} style={{
@@ -5175,7 +5181,7 @@ const ClientPortal = ({ onBack, practiceId: propPracticeId }) => {
               {/* Week Progress Timeline */}
               <div style={{ display: "grid", gap: "16px" }}>
                 {[
-                  { key: "week1", num: 1, title: "Scribe Selection", desc: "Choose and set up your AI scribe", icon: "🎯" },
+                  { key: "week1", num: 1, title: "Scribe Selection", desc: "Choose and set up your scribe", icon: "🎯" },
                   { key: "week2", num: 2, title: "EHR Integration", desc: "Connect to your electronic health record", icon: "🔗" },
                   { key: "week3", num: 3, title: "Full-Day Pilot", desc: "Test drive with real patients", icon: "🚀" },
                   { key: "week4", num: 4, title: "Coding Analysis", desc: "Review impact and make decision", icon: "📊" },
@@ -5244,19 +5250,19 @@ const ClientPortal = ({ onBack, practiceId: propPracticeId }) => {
               <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "12px" }}>What's Next?</div>
               {practice.pilot_status === "week1" && (
                 <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
-                  <p>Your DeFyb team is helping you select the right AI scribe for your practice. Once selected, we'll create your account and get the mobile app installed.</p>
-                  <p style={{ marginTop: "8px", color: DS.colors.blue }}>Expected: First AI-generated note within the week</p>
+                  <p>Your DeFyb team is helping you select the right scribe for your practice. Once selected, we'll create your account and get the mobile app installed.</p>
+                  <p style={{ marginTop: "8px", color: DS.colors.blue }}>Expected: First generated note within the week</p>
                 </div>
               )}
               {practice.pilot_status === "week2" && (
                 <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
-                  <p>We're connecting your AI scribe to your EHR system. This ensures notes flow seamlessly into patient charts.</p>
+                  <p>We're connecting your scribe to your EHR system. This ensures notes flow seamlessly into patient charts.</p>
                   <p style={{ marginTop: "8px", color: DS.colors.blue }}>Expected: Test patient notes syncing to EHR</p>
                 </div>
               )}
               {practice.pilot_status === "week3" && (
                 <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
-                  <p>Time for the real test! You'll use the AI scribe for a full day of patients. We'll be available for support throughout.</p>
+                  <p>Time for the real test! You'll use the scribe for a full day of patients. We'll be available for support throughout.</p>
                   <p style={{ marginTop: "8px", color: DS.colors.blue }}>Expected: Full day using AI, measuring time saved</p>
                 </div>
               )}
@@ -5979,7 +5985,7 @@ const TeamDashboard = ({ onBack }) => {
             {/* STACK */}
             {selectedClient.stack.length > 0 && (
               <Card style={{ marginBottom: "16px" }}>
-                <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "12px" }}>AI Stack</div>
+                <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "12px" }}>Tool Stack</div>
                 {selectedClient.stack.map((tool, i) => (
                   <div key={i} style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -6348,7 +6354,7 @@ const TeamDashboard = ({ onBack }) => {
       <Modal
         open={modalType === "implementation"}
         onClose={handleModalClose}
-        title="Select AI Stack"
+        title="Select Tool Stack"
         width="500px"
       >
         <ImplementationTracker

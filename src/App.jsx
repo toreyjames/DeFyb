@@ -6646,7 +6646,7 @@ const PracticeLogin = ({ onLogin, onBack }) => {
     setLoading(true);
     try {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: window.location.origin,
+        redirectTo: `${window.location.origin}/reset-password?audience=practice`,
       });
       if (resetError) throw resetError;
       setNotice(`Password reset email sent to ${email.trim()}.`);
@@ -8466,7 +8466,7 @@ const TeamLogin = ({ onLogin, onBack }) => {
     setLoading(true);
     try {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: window.location.origin,
+        redirectTo: `${window.location.origin}/reset-password?audience=team`,
       });
       if (resetError) throw resetError;
       setNotice(`Password reset email sent to ${email.trim()}.`);
@@ -8604,6 +8604,164 @@ const TeamLogin = ({ onLogin, onBack }) => {
 };
 
 // ============================================================
+// PASSWORD RESET
+// ============================================================
+const PasswordResetView = ({ onDone }) => {
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [hasRecoverySession, setHasRecoverySession] = useState(false);
+
+  useEffect(() => {
+    const checkRecoverySession = async () => {
+      if (!isSupabaseConfigured()) {
+        setError("Authentication not configured");
+        return;
+      }
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setHasRecoverySession(!!session?.user);
+      } catch {
+        setHasRecoverySession(false);
+      }
+    };
+    checkRecoverySession();
+  }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setNotice(null);
+
+    if (!password || password.length < 8) {
+      setError("Use at least 8 characters for the new password.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (!isSupabaseConfigured()) {
+      setError("Authentication not configured");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) throw updateError;
+      setNotice("Password updated. You can now sign in.");
+      setPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      setError(normalizeAuthError(err, "password"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Card style={{ width: "100%", maxWidth: "420px", margin: "20px" }}>
+        <div style={{ textAlign: "center", marginBottom: "24px" }}>
+          <DeFybLogo size={32} />
+          <div style={{ fontFamily: DS.fonts.mono, fontSize: "11px", color: DS.colors.vital, marginTop: "8px", letterSpacing: "0.1em" }}>
+            RESET PASSWORD
+          </div>
+        </div>
+
+        {!hasRecoverySession && !notice && (
+          <div style={{
+            padding: "10px 14px", marginBottom: "16px", borderRadius: DS.radius.sm,
+            background: DS.colors.warnDim, color: DS.colors.warn, fontSize: "13px",
+          }}>
+            Recovery link is missing or expired. Request a new password reset email.
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ display: "block", fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              New password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="At least 8 characters"
+              required
+              style={{
+                width: "100%", padding: "10px 12px", background: DS.colors.bg,
+                border: `1px solid ${DS.colors.borderLight}`, borderRadius: DS.radius.sm,
+                color: DS.colors.text, fontSize: "14px", outline: "none",
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ display: "block", fontSize: "12px", color: DS.colors.textMuted, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              Confirm password
+            </label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter new password"
+              required
+              style={{
+                width: "100%", padding: "10px 12px", background: DS.colors.bg,
+                border: `1px solid ${DS.colors.borderLight}`, borderRadius: DS.radius.sm,
+                color: DS.colors.text, fontSize: "14px", outline: "none",
+              }}
+            />
+          </div>
+
+          {error && (
+            <div style={{
+              padding: "10px 14px", marginBottom: "16px", borderRadius: DS.radius.sm,
+              background: DS.colors.dangerDim, color: DS.colors.danger, fontSize: "13px",
+            }}>
+              {error}
+            </div>
+          )}
+          {notice && (
+            <div style={{
+              padding: "10px 14px", marginBottom: "16px", borderRadius: DS.radius.sm,
+              background: DS.colors.vitalDim, color: DS.colors.vital, fontSize: "13px",
+            }}>
+              {notice}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading || !hasRecoverySession}
+            style={{
+              width: "100%", padding: "12px 28px",
+              background: DS.colors.shock, color: "#fff",
+              border: "none", borderRadius: DS.radius.md,
+              cursor: loading || !hasRecoverySession ? "not-allowed" : "pointer", fontFamily: DS.fonts.body,
+              fontSize: "15px", fontWeight: 500, letterSpacing: "0.01em",
+              opacity: (loading || !hasRecoverySession) ? 0.65 : 1, transition: "all 0.2s ease",
+            }}
+          >
+            {loading ? "Updating..." : "Set New Password"}
+          </button>
+        </form>
+
+        <div style={{ textAlign: "center", marginTop: "20px" }}>
+          <span onClick={onDone} style={{ fontSize: "13px", color: DS.colors.textMuted, cursor: "pointer" }}>
+            Return to login
+          </span>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+// ============================================================
 // APP SHELL
 // ============================================================
 export default function App() {
@@ -8643,20 +8801,24 @@ export default function App() {
   const getRouteIntent = () => {
     if (typeof window === "undefined") return null;
     const path = (window.location.pathname || "").toLowerCase();
+    if (path === "/reset-password") return "reset";
     if (path === "/team") return "team";
     if (path === "/tool" || path === "/app") return "tool";
+    if (window.location.search.includes("audience=") && path.includes("reset-password")) return "reset";
     if (window.location.search.includes("team")) return "team";
     if (window.location.search.includes("tool")) return "tool";
     return null;
   };
 
   const viewToUrl = (view) => {
+    if (view === "password-reset") return "/reset-password";
     if (view === "team" || view === "team-login") return "/team";
     if (view === "tool" || view === "practice-login") return "/tool";
     return "/";
   };
 
   const resolveIntentToView = (intent) => {
+    if (intent === "reset") return "password-reset";
     if (intent === "team") return teamUser ? "team" : "team-login";
     if (intent === "tool") return practiceUser ? "tool" : "practice-login";
     return "public";
@@ -8668,6 +8830,7 @@ export default function App() {
       const intent = getRouteIntent();
 
       if (!isSupabaseConfigured()) {
+        if (intent === "reset") setCurrentView("password-reset");
         if (intent === "team") setCurrentView("team-login");
         if (intent === "tool") setCurrentView("practice-login");
         setCheckingAuth(false);
@@ -8677,6 +8840,10 @@ export default function App() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
+          if (intent === "reset") {
+            setCurrentView("password-reset");
+            return;
+          }
           if (isTeamUser(session.user)) {
             setTeamUser(session.user);
             if (intent === "team") {
@@ -8694,6 +8861,8 @@ export default function App() {
           setCurrentView("team-login");
         } else if (intent === "tool") {
           setCurrentView("practice-login");
+        } else if (intent === "reset") {
+          setCurrentView("password-reset");
         }
       } catch (err) {
         console.error('Session check error:', err);
@@ -8711,6 +8880,8 @@ export default function App() {
           setTeamUser(null);
           setPracticeUser(null);
           setCurrentView('public');
+        } else if (event === "PASSWORD_RECOVERY") {
+          setCurrentView("password-reset");
         } else if (session?.user && isTeamUser(session.user)) {
           setTeamUser(session.user);
           setPracticeUser(null);
@@ -8821,6 +8992,18 @@ export default function App() {
     }
   };
 
+  const handlePasswordResetDone = async () => {
+    if (isSupabaseConfigured()) {
+      await supabase.auth.signOut();
+    }
+    const audience = new URLSearchParams(window.location.search).get("audience");
+    if (audience === "team") {
+      setCurrentView("team-login");
+      return;
+    }
+    setCurrentView("practice-login");
+  };
+
   if (checkingAuth) {
     return (
       <>
@@ -8859,6 +9042,11 @@ export default function App() {
         <TeamLogin
           onLogin={handleTeamLogin}
           onBack={() => setCurrentView("public")}
+        />
+      )}
+      {currentView === "password-reset" && (
+        <PasswordResetView
+          onDone={handlePasswordResetDone}
         />
       )}
       {currentView === "team" && (

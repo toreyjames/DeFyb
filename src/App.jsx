@@ -3920,6 +3920,9 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
           </p>
           <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
             <Button primary onClick={onClientLogin}>Login to Start the Tool →</Button>
+            <Button onClick={() => window.location.href = "mailto:torey@defyb.org?subject=DeFyb%20Practice%20Access"}>
+              Request Practice Access
+            </Button>
           </div>
 
           <div style={{
@@ -6555,7 +6558,7 @@ const normalizeAuthError = (err, mode = "generic") => {
 
   if (mode === "oauth") return "OAuth sign-in failed. Try again or use email login.";
   if (mode === "password") return "Email or password is incorrect.";
-  if (mode === "magic") return "Could not send magic link. Try again or use Google/Microsoft.";
+  if (mode === "magic") return "Sign-in link is unavailable. Use password or SSO.";
   return "Unable to complete sign-in. Please try again.";
 };
 
@@ -6569,6 +6572,8 @@ const PracticeLogin = ({ onLogin, onBack }) => {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [oauthUnavailable, setOauthUnavailable] = useState({ google: false, azure: false });
+  const showGoogleAuth = import.meta.env.VITE_ENABLE_GOOGLE_AUTH !== "false";
+  const showMicrosoftAuth = import.meta.env.VITE_ENABLE_MICROSOFT_AUTH !== "false";
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
@@ -6662,14 +6667,20 @@ const PracticeLogin = ({ onLogin, onBack }) => {
           </div>
         </div>
 
-        <div style={{ display: "grid", gap: "10px", marginBottom: "16px" }}>
-          <Button onClick={() => !loading && !oauthUnavailable.google && handleOAuth("google")} style={{ width: "100%", opacity: (loading || oauthUnavailable.google) ? 0.55 : 1 }}>
-            {oauthUnavailable.google ? "Google (Unavailable)" : "Continue with Google"}
-          </Button>
-          <Button onClick={() => !loading && !oauthUnavailable.azure && handleOAuth("azure")} style={{ width: "100%", opacity: (loading || oauthUnavailable.azure) ? 0.55 : 1 }}>
-            {oauthUnavailable.azure ? "Microsoft (Unavailable)" : "Continue with Microsoft"}
-          </Button>
-        </div>
+        {(showGoogleAuth || showMicrosoftAuth) && (
+          <div style={{ display: "grid", gap: "10px", marginBottom: "16px" }}>
+            {showGoogleAuth && (
+              <Button onClick={() => !loading && !oauthUnavailable.google && handleOAuth("google")} style={{ width: "100%", opacity: (loading || oauthUnavailable.google) ? 0.55 : 1 }}>
+                {oauthUnavailable.google ? "Google (Unavailable)" : "Continue with Google"}
+              </Button>
+            )}
+            {showMicrosoftAuth && (
+              <Button onClick={() => !loading && !oauthUnavailable.azure && handleOAuth("azure")} style={{ width: "100%", opacity: (loading || oauthUnavailable.azure) ? 0.55 : 1 }}>
+                {oauthUnavailable.azure ? "Microsoft (Unavailable)" : "Continue with Microsoft"}
+              </Button>
+            )}
+          </div>
+        )}
 
         <div style={{
           fontSize: "11px", color: DS.colors.textDim, marginBottom: "14px",
@@ -6794,6 +6805,7 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [encounterDetailLoading, setEncounterDetailLoading] = useState(false);
   const [dashboardMetrics, setDashboardMetrics] = useState(null);
   const [dashboardMetricsLoading, setDashboardMetricsLoading] = useState(false);
+  const draftStorageKey = "defyb:encounter-note-draft:v1";
 
   const copyText = async (label, text) => {
     if (!text) return;
@@ -6806,6 +6818,36 @@ const RevenueCaptureTool = ({ onBack }) => {
       setTimeout(() => setCopied(""), 1400);
     }
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(draftStorageKey);
+    if (saved) setNote(saved);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const timer = window.setTimeout(() => {
+      if (note.trim()) window.localStorage.setItem(draftStorageKey, note);
+      else window.localStorage.removeItem(draftStorageKey);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [note]);
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      const isMeta = event.metaKey || event.ctrlKey;
+      if (!isMeta || event.key !== "Enter") return;
+      event.preventDefault();
+      if (event.shiftKey) {
+        if (!analyzing && analysis) handleFinalizeEncounter();
+      } else if (!analyzing) {
+        runAnalysis();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [analyzing, analysis, note, billedCode, specialty, patientType, placeOfService, codingPath, totalMinutes, isTelehealth, encounterDate, surgeryDate]);
 
   const mapEncounterListToHistory = (encounters = []) => (
     encounters.map((row) => {
@@ -7174,15 +7216,34 @@ const RevenueCaptureTool = ({ onBack }) => {
     const gaps = analysis.gaps || [];
     const hasGap = (pattern) => gaps.some((g) => pattern.test((g || "").toLowerCase()));
     const isGlobalPostOp = analysis.suggestedCode === "99024";
+    const rationaleText = (analysis.rationale || []).join(" ").toLowerCase();
+    const suggestedCodeNum = Number(String(analysis.suggestedCode || "").replace(/\D/g, ""));
 
     if (!isGlobalPostOp && analysis.confidence < 0.7) {
       hardStops.push("Confidence is below 70%. Manual clinical/coding review required.");
     }
-    if (!isGlobalPostOp && codingPath === "time" && (!totalMinutes || Number(totalMinutes) < 20)) {
-      hardStops.push("Time-based coding selected but total documented minutes are below threshold.");
+    if (!isGlobalPostOp && codingPath === "time") {
+      const documentedMinutes = Number(totalMinutes || 0);
+      const minMinutes = suggestedCodeNum >= 99215 ? 40 : suggestedCodeNum >= 99214 ? 30 : 20;
+      if (!documentedMinutes || documentedMinutes < minMinutes) {
+        hardStops.push(`Time-based coding selected but documented minutes are below ${minMinutes}.`);
+      }
     }
-    if (!isGlobalPostOp && analysis.suggestedCode !== billedCode && hasGap(/risk\/benefit discussion missing|data review not clearly documented/)) {
-      hardStops.push("Suggested code increase has unresolved required documentation gaps.");
+    if (!isGlobalPostOp && analysis.suggestedCode !== billedCode && gaps.length > 0) {
+      hardStops.push("Suggested code change has unresolved documentation gaps.");
+    }
+    if (!isGlobalPostOp && suggestedCodeNum >= 99214) {
+      const evidenceSignals = [
+        /problem|chronic|acute/.test(rationaleText),
+        /medication|drug|risk/.test(rationaleText),
+        /data|lab|imaging|review/.test(rationaleText),
+      ].filter(Boolean).length;
+      if (evidenceSignals < 2) {
+        hardStops.push("Insufficient evidence categories for higher-level E/M recommendation.");
+      }
+    }
+    if (isGlobalPostOp && !surgeryDate) {
+      hardStops.push("99024 requires surgery date documentation before finalization.");
     }
 
     if (placeOfService === "telehealth" && !isTelehealth) {
@@ -7197,6 +7258,54 @@ const RevenueCaptureTool = ({ onBack }) => {
 
     return { hardStops, warnings, canFinalize: hardStops.length === 0 };
   })();
+  const timelineEvents = (() => {
+    if (!analysis) return [];
+    const events = [
+      { at: analysis.id ? "now" : null, text: "Analysis generated" },
+      ...(history.find((h) => h.id === analysis.id)?.acceptedAt
+        ? [{ at: new Date(history.find((h) => h.id === analysis.id).acceptedAt).toLocaleString(), text: "Recommendation finalized" }]
+        : []),
+      ...((encounterDetail?.audit_events || []).slice(0, 4).map((ev) => ({
+        at: new Date(ev.created_at).toLocaleString(),
+        text: ev.event_type,
+      }))),
+    ].filter((e) => e.at || e.text);
+    return events;
+  })();
+  const exportJustificationPdf = async () => {
+    if (!analysis) return;
+    const { default: jsPDF } = await import("jspdf");
+    const doc = new jsPDF();
+    const lines = [
+      "DeFyb Billing Justification Packet",
+      "",
+      `Encounter Date: ${encounterDate || "-"}`,
+      `Billed Code: ${billedCode}`,
+      `Suggested Code: ${analysis.suggestedCode}`,
+      `Confidence: ${Math.round(analysis.confidence * 100)}%`,
+      "",
+      "Rationale:",
+      ...(analysis.rationale || []).map((r) => `- ${r}`),
+      "",
+      "Documentation Gaps:",
+      ...((analysis.gaps || []).length > 0 ? analysis.gaps : ["- No major gaps detected."]).map((g) => `- ${g}`),
+      "",
+      `Estimated Delta / Visit: $${analysis.estimatedDeltaPerVisit}`,
+      `Estimated Monthly Recovery: $${analysis.estimatedMonthlyRecovery.toLocaleString()}`,
+    ];
+    let y = 18;
+    doc.setFontSize(12);
+    lines.forEach((line) => {
+      const wrapped = doc.splitTextToSize(line, 180);
+      doc.text(wrapped, 14, y);
+      y += wrapped.length * 6;
+      if (y > 280) {
+        doc.addPage();
+        y = 18;
+      }
+    });
+    doc.save(`defyb-justification-${Date.now()}.pdf`);
+  };
 
   const loadQueue = () => {
     const parsed = queueInput
@@ -7390,6 +7499,9 @@ const RevenueCaptureTool = ({ onBack }) => {
         <SectionTitle sub="Paste encounter documentation and get billing intelligence in seconds.">
           Revenue Capture Tool
         </SectionTitle>
+        <div style={{ marginBottom: "10px", fontSize: "12px", color: DS.colors.textMuted }}>
+          Clinic-safe mode: encounter notes in this tool are not sent to analytics.
+        </div>
 
         <Card style={{ marginBottom: "14px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: "12px", flexWrap: "wrap" }}>
@@ -7556,6 +7668,9 @@ const RevenueCaptureTool = ({ onBack }) => {
                 outline: "none",
               }}
             />
+            <div style={{ marginTop: "8px", fontSize: "12px", color: DS.colors.textMuted }}>
+              Shortcuts: <span style={{ fontFamily: DS.fonts.mono }}>Ctrl/Cmd + Enter</span> analyze · <span style={{ fontFamily: DS.fonts.mono }}>Ctrl/Cmd + Shift + Enter</span> finalize
+            </div>
             <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
               <Button
                 small
@@ -7814,6 +7929,21 @@ const RevenueCaptureTool = ({ onBack }) => {
               </Card>
             )}
 
+            <Card>
+              <div style={{ fontWeight: 600, marginBottom: "8px" }}>Encounter Timeline</div>
+              {timelineEvents.length === 0 ? (
+                <div style={{ fontSize: "12px", color: DS.colors.textMuted }}>No timeline events yet.</div>
+              ) : (
+                <div style={{ display: "grid", gap: "6px" }}>
+                  {timelineEvents.map((ev, idx) => (
+                    <div key={`${ev.text}-${idx}`} style={{ fontSize: "12px", color: DS.colors.textMuted }}>
+                      {ev.at ? `${ev.at} · ` : ""}{ev.text}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
             <Card>
               <div style={{ fontWeight: 600, marginBottom: "10px" }}>Billing Justification</div>
@@ -7845,6 +7975,9 @@ const RevenueCaptureTool = ({ onBack }) => {
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                   <Button small onClick={() => copyText("Copied billing summary", billingSummary)}>
                     Copy Billing Summary
+                  </Button>
+                  <Button small onClick={exportJustificationPdf}>
+                    Download Justification PDF
                   </Button>
                   <Button
                     small
@@ -7988,6 +8121,36 @@ const RevenueCaptureTool = ({ onBack }) => {
                             <option value="99214">99214</option>
                             <option value="99215">99215</option>
                           </select>
+                          <button
+                            type="button"
+                            onClick={() => saveReview({ ...h, reviewStatus: "agree", reviewerCode: h.suggestedCode })}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: DS.radius.sm,
+                              border: `1px solid ${DS.colors.vital}`,
+                              background: DS.colors.vitalDim,
+                              color: DS.colors.vital,
+                              cursor: "pointer",
+                              fontSize: "12px",
+                            }}
+                          >
+                            Quick Agree
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => saveReview({ ...h, reviewStatus: "disagree", reviewerCode: h.billedCode || "" })}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: DS.radius.sm,
+                              border: `1px solid ${DS.colors.warn}`,
+                              background: DS.colors.warnDim,
+                              color: DS.colors.warn,
+                              cursor: "pointer",
+                              fontSize: "12px",
+                            }}
+                          >
+                            Quick Disagree
+                          </button>
                           <button
                             type="button"
                             onClick={() => saveReview(h)}
@@ -8170,6 +8333,8 @@ const TeamLogin = ({ onLogin, onBack }) => {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [oauthUnavailable, setOauthUnavailable] = useState({ google: false, azure: false });
+  const showGoogleAuth = import.meta.env.VITE_ENABLE_GOOGLE_AUTH !== "false";
+  const showMicrosoftAuth = import.meta.env.VITE_ENABLE_MICROSOFT_AUTH !== "false";
 
   const allowedDomains = (import.meta.env.VITE_ALLOWED_TEAM_DOMAINS || "defyb.org")
     .split(",")
@@ -8299,14 +8464,20 @@ const TeamLogin = ({ onLogin, onBack }) => {
           </div>
         </div>
 
-        <div style={{ display: "grid", gap: "10px", marginBottom: "16px" }}>
-          <Button onClick={() => !loading && !oauthUnavailable.google && handleOAuth("google")} style={{ width: "100%", opacity: (loading || oauthUnavailable.google) ? 0.55 : 1 }}>
-            {oauthUnavailable.google ? "Google (Unavailable)" : "Continue with Google"}
-          </Button>
-          <Button onClick={() => !loading && !oauthUnavailable.azure && handleOAuth("azure")} style={{ width: "100%", opacity: (loading || oauthUnavailable.azure) ? 0.55 : 1 }}>
-            {oauthUnavailable.azure ? "Microsoft (Unavailable)" : "Continue with Microsoft"}
-          </Button>
-        </div>
+        {(showGoogleAuth || showMicrosoftAuth) && (
+          <div style={{ display: "grid", gap: "10px", marginBottom: "16px" }}>
+            {showGoogleAuth && (
+              <Button onClick={() => !loading && !oauthUnavailable.google && handleOAuth("google")} style={{ width: "100%", opacity: (loading || oauthUnavailable.google) ? 0.55 : 1 }}>
+                {oauthUnavailable.google ? "Google (Unavailable)" : "Continue with Google"}
+              </Button>
+            )}
+            {showMicrosoftAuth && (
+              <Button onClick={() => !loading && !oauthUnavailable.azure && handleOAuth("azure")} style={{ width: "100%", opacity: (loading || oauthUnavailable.azure) ? 0.55 : 1 }}>
+                {oauthUnavailable.azure ? "Microsoft (Unavailable)" : "Continue with Microsoft"}
+              </Button>
+            )}
+          </div>
+        )}
 
         <div style={{
           fontSize: "11px", color: DS.colors.textDim, marginBottom: "14px",

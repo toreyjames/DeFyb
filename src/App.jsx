@@ -3860,7 +3860,7 @@ const StageActions = ({ practice, onAction }) => {
 // ============================================================
 // PUBLIC SITE
 // ============================================================
-const PublicSite = ({ onLogin, onClientLogin }) => {
+const PublicSite = ({ onLogin, onClientLogin, onDemoStart }) => {
   const intakeRef = useRef(null);
   const [submitted, setSubmitted] = useState(false);
   const [baselineRan, setBaselineRan] = useState(false);
@@ -3942,6 +3942,7 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
           <HeartbeatLine width={220} style={{ margin: "0 auto 24px" }} />
           <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
             <Button primary onClick={onClientLogin}>Login to Start the Tool →</Button>
+            <Button onClick={onDemoStart}>Try 2-Minute Demo (No Login)</Button>
             <Button onClick={() => window.location.href = "mailto:torey@defyb.org?subject=DeFyb%20Practice%20Access"}>
               Request Practice Access
             </Button>
@@ -6560,7 +6561,7 @@ const normalizeAuthError = (err, mode = "generic") => {
   const raw = (err?.message || "").toLowerCase();
 
   if (!raw) {
-    if (mode === "oauth") return "Sign-in provider failed. Try Google, Microsoft, or email magic link.";
+    if (mode === "oauth") return "Sign-in provider failed. Try Google, Microsoft, or email/password.";
     if (mode === "password") return "Email or password is incorrect.";
     return "Unable to complete sign-in. Please try again.";
   }
@@ -6590,7 +6591,7 @@ const normalizeAuthError = (err, mode = "generic") => {
 // ============================================================
 // PRACTICE LOGIN
 // ============================================================
-const PracticeLogin = ({ onLogin, onBack }) => {
+const PracticeLogin = ({ onLogin, onBack, onDemoStart }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -6789,6 +6790,12 @@ const PracticeLogin = ({ onLogin, onBack }) => {
         <p style={{ textAlign: "center", marginTop: "16px", fontSize: "12px", color: DS.colors.textDim }}>
           <span onClick={() => !loading && handlePasswordReset()} style={{ color: DS.colors.shock, cursor: "pointer" }}>Forgot password</span>
         </p>
+        <p style={{ textAlign: "center", marginTop: "8px", fontSize: "12px", color: DS.colors.textDim }}>
+          New practice? <span onClick={() => !loading && onDemoStart?.()} style={{ color: DS.colors.shock, cursor: "pointer" }}>Run instant demo</span> or{" "}
+          <span onClick={() => (window.location.href = "mailto:torey@defyb.org?subject=DeFyb%20Practice%20Onboarding")} style={{ color: DS.colors.shock, cursor: "pointer" }}>
+            request onboarding
+          </span>
+        </p>
 
         <div style={{ textAlign: "center", marginTop: "20px" }}>
           <span onClick={onBack} style={{ fontSize: "13px", color: DS.colors.textMuted, cursor: "pointer" }}>
@@ -6803,7 +6810,7 @@ const PracticeLogin = ({ onLogin, onBack }) => {
 // ============================================================
 // PRACTICE TOOL
 // ============================================================
-const RevenueCaptureTool = ({ onBack }) => {
+const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
   const [note, setNote] = useState("");
   const [billedCode, setBilledCode] = useState("99213");
   const [specialty, setSpecialty] = useState("General");
@@ -6840,6 +6847,7 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [showQueuePanel, setShowQueuePanel] = useState(false);
   const [showAdvancedReview, setShowAdvancedReview] = useState(false);
   const draftStorageKey = "defyb:encounter-note-draft:v1";
+  const effectiveDemoMode = demoMode || !isSupabaseConfigured();
 
   const copyText = async (label, text) => {
     if (!text) return;
@@ -6923,7 +6931,7 @@ const RevenueCaptureTool = ({ onBack }) => {
   );
 
   const loadHistory = async () => {
-    if (!isSupabaseConfigured()) return;
+    if (effectiveDemoMode) return;
     try {
       const payload = await invokeEncountersApi("/encounters?limit=20", "GET");
       setHistory(mapEncounterListToHistory(payload?.encounters || []));
@@ -6934,7 +6942,7 @@ const RevenueCaptureTool = ({ onBack }) => {
 
   useEffect(() => {
     const loadBillingProfile = async () => {
-      if (!isSupabaseConfigured()) return;
+      if (effectiveDemoMode) return;
       const { data } = await supabase
         .from("billing_profiles")
         .select("billing_status, plan_code, implementation_enabled, monthly_amount, stripe_subscription_id, licensed_provider_count, active_provider_count")
@@ -6948,7 +6956,7 @@ const RevenueCaptureTool = ({ onBack }) => {
 
     loadHistory();
     loadBillingProfile();
-  }, []);
+  }, [effectiveDemoMode]);
 
   const startSubscriptionCheckout = async () => {
     if (!isSupabaseConfigured()) {
@@ -7043,7 +7051,7 @@ const RevenueCaptureTool = ({ onBack }) => {
   };
 
   const loadDashboardMetrics = async () => {
-    if (!isSupabaseConfigured()) return;
+    if (effectiveDemoMode) return;
     try {
       setDashboardMetricsLoading(true);
       const metrics = await invokeEncountersApi("/dashboard/metrics", "GET");
@@ -7057,7 +7065,7 @@ const RevenueCaptureTool = ({ onBack }) => {
 
   useEffect(() => {
     loadDashboardMetrics();
-  }, []);
+  }, [effectiveDemoMode]);
 
   const runAnalysis = async (noteOverride = null, queueIdOverride = null, autoAdvance = true, manageLoading = true) => {
     const effectiveNote = typeof noteOverride === "string" ? noteOverride : note;
@@ -7068,11 +7076,6 @@ const RevenueCaptureTool = ({ onBack }) => {
       setTimeout(() => setCopied(""), 1400);
       return false;
     }
-    if (!isSupabaseConfigured()) {
-      setError("Coding analysis service is not configured.");
-      return false;
-    }
-
     if (manageLoading) setAnalyzing(true);
     setError(null);
 
@@ -7088,60 +7091,102 @@ const RevenueCaptureTool = ({ onBack }) => {
       };
 
       let mapped = null;
+      if (effectiveDemoMode) {
+        const local = analyzeEncounterNote(effectiveNote, billedCode);
+        const postopDetected = /(post[- ]?op|postoperative|global period|surgery follow-up)/i.test(effectiveNote);
+        if (postopDetected && surgeryDate && encounterDate) {
+          const surgeryTs = new Date(surgeryDate).getTime();
+          const encounterTs = new Date(encounterDate).getTime();
+          const dayDiff = Math.floor((encounterTs - surgeryTs) / (1000 * 60 * 60 * 24));
+          if (dayDiff >= 0 && dayDiff <= 90) {
+            local.suggestedCode = "99024";
+            local.estimatedDeltaPerVisit = 0;
+            local.estimatedMonthlyRecovery = 0;
+            local.rationale = [
+              "Encounter appears to be post-op follow-up within the 90-day global period.",
+              ...(local.rationale || []),
+            ];
+            local.gaps = (local.gaps || []).filter((g) => !/risk\/benefit/i.test(g));
+          }
+        }
+        mapped = {
+          id: `demo-${Date.now()}`,
+          at: new Date().toLocaleString(),
+          specialty,
+          billedCode,
+          suggestedCode: local.suggestedCode,
+          recommendationId: null,
+          modelVersion: "demo-rules-v1",
+          encounterContext,
+          confidence: local.confidence || 0.78,
+          estimatedDeltaPerVisit: Number(local.estimatedDeltaPerVisit || 0),
+          noteSnippet: "",
+          rationale: local.rationale || [],
+          gaps: local.gaps || [],
+          suggestions: local.suggestions || [],
+          estimatedMonthlyRecovery: Number(local.estimatedMonthlyRecovery || 0),
+          reviewStatus: "pending",
+          reviewerCode: "",
+          reviewerNotes: "",
+          acceptedCode: "",
+          acceptedAt: null,
+          encounterId: null,
+        };
+      } else {
+        const created = await invokeEncountersApi("/encounters", "POST", {
+          encounter_date: encounterDate,
+          visit_type: "office_followup",
+          patient_type: patientType,
+          pos: placeOfService,
+          telehealth: isTelehealth,
+          minutes: codingPath === "time" ? Math.max(0, Number(totalMinutes || 0)) : null,
+        });
+        const encounterId = created.encounter_id;
+        setActiveEncounterId(encounterId);
 
-      const created = await invokeEncountersApi("/encounters", "POST", {
-        encounter_date: encounterDate,
-        visit_type: "office_followup",
-        patient_type: patientType,
-        pos: placeOfService,
-        telehealth: isTelehealth,
-        minutes: codingPath === "time" ? Math.max(0, Number(totalMinutes || 0)) : null,
-      });
-      const encounterId = created.encounter_id;
-      setActiveEncounterId(encounterId);
+        await invokeEncountersApi(`/encounters/${encounterId}/note`, "POST", {
+          raw_note: effectiveNote,
+          source: "manual",
+        });
 
-      await invokeEncountersApi(`/encounters/${encounterId}/note`, "POST", {
-        raw_note: effectiveNote,
-        source: "manual",
-      });
+        const analyzed = await invokeEncountersApi(`/encounters/${encounterId}/analyze`, "POST", {
+          current_code: billedCode,
+          payer_name: "FALLBACK",
+          state: "NA",
+          specialty,
+          context: encounterContext,
+        });
 
-      const analyzed = await invokeEncountersApi(`/encounters/${encounterId}/analyze`, "POST", {
-        current_code: billedCode,
-        payer_name: "FALLBACK",
-        state: "NA",
-        specialty,
-        context: encounterContext,
-      });
+        const rec = analyzed.recommendation || {};
+        const rev = analyzed.revenue_impact || {};
+        const confidenceMap = { high: 0.9, medium: 0.75, low: 0.6 };
+        const gapText = rec.documentation_gap_text || "";
+        const gapItems = gapText ? gapText.split(/(?<=\.)\s+/).filter(Boolean) : [];
 
-      const rec = analyzed.recommendation || {};
-      const rev = analyzed.revenue_impact || {};
-      const confidenceMap = { high: 0.9, medium: 0.75, low: 0.6 };
-      const gapText = rec.documentation_gap_text || "";
-      const gapItems = gapText ? gapText.split(/(?<=\.)\s+/).filter(Boolean) : [];
-
-      mapped = {
-        id: rec.recommendation_id || encounterId,
-        at: new Date().toLocaleString(),
-        specialty,
-        billedCode,
-        suggestedCode: rec.suggested_code,
-        recommendationId: rec.recommendation_id || null,
-        modelVersion: analyzed.rule_version || "rules-v1.0-em-core",
-        encounterContext,
-        confidence: confidenceMap[rec.confidence] || 0.75,
-        estimatedDeltaPerVisit: Number(rev.delta_amount || 0),
-        noteSnippet: "",
-        rationale: rec.rationale || [],
-        gaps: gapItems,
-        suggestions: gapItems,
-        estimatedMonthlyRecovery: Number(rev.delta_amount || 0) * 80,
-        reviewStatus: "pending",
-        reviewerCode: "",
-        reviewerNotes: "",
-        acceptedCode: "",
-        acceptedAt: null,
-        encounterId,
-      };
+        mapped = {
+          id: rec.recommendation_id || encounterId,
+          at: new Date().toLocaleString(),
+          specialty,
+          billedCode,
+          suggestedCode: rec.suggested_code,
+          recommendationId: rec.recommendation_id || null,
+          modelVersion: analyzed.rule_version || "rules-v1.0-em-core",
+          encounterContext,
+          confidence: confidenceMap[rec.confidence] || 0.75,
+          estimatedDeltaPerVisit: Number(rev.delta_amount || 0),
+          noteSnippet: "",
+          rationale: rec.rationale || [],
+          gaps: gapItems,
+          suggestions: gapItems,
+          estimatedMonthlyRecovery: Number(rev.delta_amount || 0) * 80,
+          reviewStatus: "pending",
+          reviewerCode: "",
+          reviewerNotes: "",
+          acceptedCode: "",
+          acceptedAt: null,
+          encounterId,
+        };
+      }
 
       setAnalysis({
         id: mapped.id,
@@ -7156,8 +7201,10 @@ const RevenueCaptureTool = ({ onBack }) => {
         estimatedMonthlyRecovery: mapped.estimatedMonthlyRecovery,
       });
       setHistory((prev) => [mapped, ...prev.filter((p) => p.id !== mapped.id)].slice(0, 20));
-      loadHistory();
-      loadDashboardMetrics();
+      if (!effectiveDemoMode) {
+        loadHistory();
+        loadDashboardMetrics();
+      }
 
       if (queueTargetId) {
         let nextQueueId = null;
@@ -7448,6 +7495,14 @@ const RevenueCaptureTool = ({ onBack }) => {
 
     const acceptedAt = new Date().toISOString();
     const encounterIdForSelection = analysis.encounterId || activeEncounterId;
+    if (effectiveDemoMode) {
+      setHistory((prev) => prev.map((h) => (
+        h.id === analysis.id
+          ? { ...h, acceptedCode: analysis.suggestedCode, acceptedAt }
+          : h
+      )));
+      return;
+    }
 
     if (encounterIdForSelection) {
       try {
@@ -7484,6 +7539,11 @@ const RevenueCaptureTool = ({ onBack }) => {
   };
 
   const saveReview = async (item) => {
+    if (effectiveDemoMode) {
+      setCopied("Advanced review is available after sign-in.");
+      setTimeout(() => setCopied(""), 1400);
+      return;
+    }
     if (!isSupabaseConfigured()) return;
     const draft = reviewDrafts[item.id] || {};
     const reviewStatus = draft.reviewStatus || item.reviewStatus || "pending";
@@ -7526,7 +7586,9 @@ const RevenueCaptureTool = ({ onBack }) => {
         borderBottom: `1px solid ${DS.colors.border}`,
       }}>
         <DeFybLogo size={24} />
-        <span onClick={onBack} style={{ fontSize: "13px", color: DS.colors.textMuted, cursor: "pointer" }}>Sign out</span>
+        <span onClick={onBack} style={{ fontSize: "13px", color: DS.colors.textMuted, cursor: "pointer" }}>
+          {effectiveDemoMode ? "Exit Demo" : "Sign out"}
+        </span>
       </nav>
 
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "92px 20px 40px" }}>
@@ -7536,10 +7598,31 @@ const RevenueCaptureTool = ({ onBack }) => {
         <div style={{ marginBottom: "10px", fontSize: "12px", color: DS.colors.textMuted }}>
           Clinic-safe mode: encounter notes in this tool are not sent to analytics.
         </div>
+        {effectiveDemoMode && (
+          <div style={{
+            marginBottom: "12px",
+            padding: "10px 12px",
+            borderRadius: DS.radius.md,
+            border: `1px solid ${DS.colors.blue}`,
+            background: DS.colors.blueDim,
+            fontSize: "12px",
+            color: DS.colors.text,
+          }}>
+            Demo mode: no account required. Results are instant and not saved to your organization.
+            <span
+              onClick={() => (window.location.href = "/tool")}
+              style={{ marginLeft: "8px", color: DS.colors.shock, cursor: "pointer", fontWeight: 700 }}
+            >
+              Create account →
+            </span>
+          </div>
+        )}
         <div style={{ marginBottom: "12px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          <Button small onClick={() => setShowBillingPanel((v) => !v)}>
-            {showBillingPanel ? "Hide Billing Panel" : "Show Billing Panel"}
-          </Button>
+          {!effectiveDemoMode && (
+            <Button small onClick={() => setShowBillingPanel((v) => !v)}>
+              {showBillingPanel ? "Hide Billing Panel" : "Show Billing Panel"}
+            </Button>
+          )}
           <Button small onClick={() => setShowQueuePanel((v) => !v)}>
             {showQueuePanel ? "Hide Queue Mode" : "Show Queue Mode"}
           </Button>
@@ -7548,7 +7631,7 @@ const RevenueCaptureTool = ({ onBack }) => {
           </Button>
         </div>
 
-        {showBillingPanel && (
+        {!effectiveDemoMode && showBillingPanel && (
         <Card style={{ marginBottom: "14px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: "12px", flexWrap: "wrap" }}>
             <div>
@@ -8845,6 +8928,7 @@ export default function App() {
     if (typeof window === "undefined") return null;
     const path = (window.location.pathname || "").toLowerCase();
     if (path === "/reset-password") return "reset";
+    if (path === "/demo") return "demo";
     if (path === "/team") return "team";
     if (path === "/tool" || path === "/app") return "tool";
     if (window.location.search.includes("audience=") && path.includes("reset-password")) return "reset";
@@ -8855,6 +8939,7 @@ export default function App() {
 
   const viewToUrl = (view) => {
     if (view === "password-reset") return "/reset-password";
+    if (view === "tool-demo") return "/demo";
     if (view === "team" || view === "team-login") return "/team";
     if (view === "tool" || view === "practice-login") return "/tool";
     return "/";
@@ -8862,6 +8947,7 @@ export default function App() {
 
   const resolveIntentToView = (intent) => {
     if (intent === "reset") return "password-reset";
+    if (intent === "demo") return "tool-demo";
     if (intent === "team") return teamUser ? "team" : "team-login";
     if (intent === "tool") return practiceUser ? "tool" : "practice-login";
     return "public";
@@ -8874,6 +8960,7 @@ export default function App() {
 
       if (!isSupabaseConfigured()) {
         if (intent === "reset") setCurrentView("password-reset");
+        if (intent === "demo") setCurrentView("tool-demo");
         if (intent === "team") setCurrentView("team-login");
         if (intent === "tool") setCurrentView("practice-login");
         setCheckingAuth(false);
@@ -8883,6 +8970,10 @@ export default function App() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
+          if (intent === "demo") {
+            setCurrentView("tool-demo");
+            return;
+          }
           if (intent === "reset") {
             setCurrentView("password-reset");
             return;
@@ -8904,6 +8995,8 @@ export default function App() {
           setCurrentView("team-login");
         } else if (intent === "tool") {
           setCurrentView("practice-login");
+        } else if (intent === "demo") {
+          setCurrentView("tool-demo");
         } else if (intent === "reset") {
           setCurrentView("password-reset");
         }
@@ -9035,6 +9128,10 @@ export default function App() {
     }
   };
 
+  const handleStartDemo = () => {
+    setCurrentView("tool-demo");
+  };
+
   const handlePasswordResetDone = async () => {
     if (isSupabaseConfigured()) {
       await supabase.auth.signOut();
@@ -9073,11 +9170,13 @@ export default function App() {
         <PublicSite
           onLogin={handleRequestTeamAccess}
           onClientLogin={handleRequestPracticeAccess}
+          onDemoStart={handleStartDemo}
         />
       )}
       {currentView === "practice-login" && (
         <PracticeLogin
           onLogin={handlePracticeLogin}
+          onDemoStart={handleStartDemo}
           onBack={() => setCurrentView("public")}
         />
       )}
@@ -9108,9 +9207,16 @@ export default function App() {
         ) : (
           <PracticeLogin
             onLogin={handlePracticeLogin}
+            onDemoStart={handleStartDemo}
             onBack={() => setCurrentView("public")}
           />
         )
+      )}
+      {currentView === "tool-demo" && (
+        <RevenueCaptureTool
+          demoMode
+          onBack={() => setCurrentView("public")}
+        />
       )}
     </ConfigProvider>
   );

@@ -3947,6 +3947,17 @@ const PublicSite = ({ onLogin, onClientLogin, onDemoStart }) => {
               Request Practice Access
             </Button>
           </div>
+          <div style={{ marginTop: "12px", display: "flex", gap: "10px", justifyContent: "center", flexWrap: "wrap", fontSize: "12px" }}>
+            <span style={{ color: DS.colors.shock, cursor: "pointer" }} onClick={() => window.location.href = "/multi-clinic-provider-coding"}>
+              Multi-clinic provider workflow
+            </span>
+            <span style={{ color: DS.colors.shock, cursor: "pointer" }} onClick={() => window.location.href = "/orthopedic-coding-revenue-capture"}>
+              Orthopedic revenue capture
+            </span>
+            <span style={{ color: DS.colors.shock, cursor: "pointer" }} onClick={() => window.location.href = "/small-practice-underbilling-tool"}>
+              Small-practice underbilling tool
+            </span>
+          </div>
 
           <div style={{
             marginTop: "34px",
@@ -9551,6 +9562,102 @@ const PasswordResetView = ({ onDone }) => {
 };
 
 // ============================================================
+// SEO LANDING PAGE
+// ============================================================
+const MarketingLandingPage = ({
+  kicker,
+  title,
+  subtitle,
+  bullets = [],
+  faqs = [],
+  onClientLogin,
+  onDemoStart,
+  onBack,
+}) => (
+  <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <nav style={{
+      position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      padding: "12px clamp(16px, 4vw, 80px)",
+      background: `${DS.colors.bg}ee`, backdropFilter: "blur(12px)",
+      borderBottom: `1px solid ${DS.colors.border}`,
+    }}>
+      <div onClick={onBack} style={{ cursor: "pointer" }}>
+        <DeFybLogo size={28} />
+      </div>
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <Button small onClick={onDemoStart}>Try Demo</Button>
+        <Button primary small onClick={onClientLogin}>Login</Button>
+      </div>
+    </nav>
+
+    <div style={{ width: "100%", maxWidth: "980px", margin: "0 auto", padding: "110px 22px 40px" }}>
+      <div style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "8px",
+        fontSize: "11px",
+        letterSpacing: "0.1em",
+        textTransform: "uppercase",
+        color: DS.colors.shock,
+        marginBottom: "14px",
+        padding: "6px 10px",
+        borderRadius: "999px",
+        border: `1px solid ${DS.colors.border}`,
+        background: DS.colors.bgCard,
+      }}>
+        {kicker}
+      </div>
+      <h1 style={{
+        fontFamily: DS.fonts.display,
+        fontSize: "clamp(30px, 5vw, 56px)",
+        lineHeight: 1.05,
+        letterSpacing: "-0.03em",
+        marginBottom: "14px",
+      }}>
+        {title}
+      </h1>
+      <p style={{ fontSize: "18px", color: DS.colors.textMuted, marginBottom: "20px", maxWidth: "860px" }}>
+        {subtitle}
+      </p>
+      <HeartbeatLine width={240} style={{ marginBottom: "18px" }} />
+      <div style={{ display: "grid", gap: "10px", marginBottom: "20px" }}>
+        {bullets.map((item, idx) => (
+          <Card key={idx} style={{ padding: "14px 16px" }}>
+            <div style={{ fontSize: "14px", color: DS.colors.textMuted }}>• {item}</div>
+          </Card>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "26px" }}>
+        <Button primary onClick={onDemoStart}>Try 2-Minute Demo</Button>
+        <Button onClick={onClientLogin}>Login to Start the Tool</Button>
+      </div>
+      <div style={{ fontSize: "12px", color: DS.colors.textDim, marginBottom: "10px" }}>
+        Related pages:
+        {" "}
+        <span style={{ color: DS.colors.shock, cursor: "pointer" }} onClick={() => (window.location.href = "/multi-clinic-provider-coding")}>Multi-clinic providers</span>
+        {" · "}
+        <span style={{ color: DS.colors.shock, cursor: "pointer" }} onClick={() => (window.location.href = "/orthopedic-coding-revenue-capture")}>Orthopedic coding</span>
+        {" · "}
+        <span style={{ color: DS.colors.shock, cursor: "pointer" }} onClick={() => (window.location.href = "/small-practice-underbilling-tool")}>Underbilling tool</span>
+      </div>
+
+      <Card>
+        <div style={{ fontWeight: 600, marginBottom: "10px" }}>FAQ</div>
+        <div style={{ display: "grid", gap: "10px" }}>
+          {faqs.map((faq, idx) => (
+            <div key={idx}>
+              <div style={{ fontWeight: 600, fontSize: "13px" }}>{faq.q}</div>
+              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>{faq.a}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  </div>
+);
+
+// ============================================================
 // APP SHELL
 // ============================================================
 export default function App() {
@@ -9560,6 +9667,59 @@ export default function App() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const hasInitializedHistory = useRef(false);
   const isPopNavigating = useRef(false);
+  const seoPages = {
+    "seo-multi-clinic": {
+      path: "/multi-clinic-provider-coding",
+      title: "Multi Clinic Provider Coding Tool | DeFyb",
+      description: "One provider login across multiple clinics. Capture underbilling and coding gaps per clinic without extra admin work.",
+      kicker: "Multi-Clinic Provider Workflow",
+      headline: "One provider login. Multiple clinics. Revenue captured per clinic.",
+      subtitle: "DeFyb gives providers a single login while preserving clinic-level coding, reporting, and billing separation.",
+      bullets: [
+        "Switch clinic context instantly without new logins.",
+        "Coding recommendations and revenue delta stay clinic-scoped.",
+        "Each clinic keeps separate billing and audit history.",
+      ],
+      faqs: [
+        { q: "Does the provider need multiple logins?", a: "No. One login, multiple clinic memberships." },
+        { q: "Is data mixed across clinics?", a: "No. Encounter data and metrics are scoped to the selected clinic." },
+      ],
+    },
+    "seo-ortho-capture": {
+      path: "/orthopedic-coding-revenue-capture",
+      title: "Orthopedic Coding Revenue Capture Software | DeFyb",
+      description: "Detect underbilling in orthopedic encounters, including post-op global period logic like 99024, with audit-ready rationale.",
+      kicker: "Orthopedic Revenue Capture",
+      headline: "Stop missing orthopedic revenue from undercoded visits.",
+      subtitle: "DeFyb analyzes orthopedic encounter notes, suggests compliant E/M levels, and flags documentation gaps before billing.",
+      bullets: [
+        "Built-in 99024 global period handling for post-op follow-ups.",
+        "Evidence bullets explain why a level is justified.",
+        "Shows per-visit and monthly recovery estimates.",
+      ],
+      faqs: [
+        { q: "Can DeFyb handle post-op visits?", a: "Yes. It detects global period context and supports 99024 logic." },
+        { q: "Do providers stay in control?", a: "Yes. DeFyb suggests; clinicians and billing teams approve." },
+      ],
+    },
+    "seo-underbilling-tool": {
+      path: "/small-practice-underbilling-tool",
+      title: "Small Practice Underbilling Detection Tool | DeFyb",
+      description: "A coding-first tool for small practices to find underbilling, close documentation gaps, and recover revenue quickly.",
+      kicker: "Small Practice Coding Intelligence",
+      headline: "Find underbilling fast and protect small-practice margin.",
+      subtitle: "Use DeFyb to review encounter documentation, correct coding support, and recover missed revenue without adding work.",
+      bullets: [
+        "2-minute demo with no login required.",
+        "Coding-first workflow built for speed and adoption.",
+        "Clear ROI view: undercoded visits and estimated recovery.",
+      ],
+      faqs: [
+        { q: "Is this a full autonomous coder?", a: "No. It is an explainable coding guardrail and revenue capture tool." },
+        { q: "How quickly can a clinic start?", a: "Demo immediately, then move to clinic setup and provider invites." },
+      ],
+    },
+  };
 
   const allowedDomains = (import.meta.env.VITE_ALLOWED_TEAM_DOMAINS || "defyb.org")
     .split(",")
@@ -9590,6 +9750,9 @@ export default function App() {
   const getRouteIntent = () => {
     if (typeof window === "undefined") return null;
     const path = (window.location.pathname || "").toLowerCase();
+    if (path === "/multi-clinic-provider-coding") return "seo-multi-clinic";
+    if (path === "/orthopedic-coding-revenue-capture") return "seo-ortho-capture";
+    if (path === "/small-practice-underbilling-tool") return "seo-underbilling-tool";
     if (path === "/reset-password") return "reset";
     if (path === "/demo") return "demo";
     if (path === "/team") return "team";
@@ -9601,6 +9764,9 @@ export default function App() {
   };
 
   const viewToUrl = (view) => {
+    if (view === "seo-multi-clinic") return "/multi-clinic-provider-coding";
+    if (view === "seo-ortho-capture") return "/orthopedic-coding-revenue-capture";
+    if (view === "seo-underbilling-tool") return "/small-practice-underbilling-tool";
     if (view === "password-reset") return "/reset-password";
     if (view === "tool-demo") return "/demo";
     if (view === "team" || view === "team-login") return "/team";
@@ -9609,6 +9775,9 @@ export default function App() {
   };
 
   const resolveIntentToView = (intent) => {
+    if (intent === "seo-multi-clinic") return "seo-multi-clinic";
+    if (intent === "seo-ortho-capture") return "seo-ortho-capture";
+    if (intent === "seo-underbilling-tool") return "seo-underbilling-tool";
     if (intent === "reset") return "password-reset";
     if (intent === "demo") return "tool-demo";
     if (intent === "team") return teamUser ? "team" : "team-login";
@@ -9620,8 +9789,10 @@ export default function App() {
   useEffect(() => {
     const checkSession = async () => {
       const intent = getRouteIntent();
+      const isSeoIntent = intent === "seo-multi-clinic" || intent === "seo-ortho-capture" || intent === "seo-underbilling-tool";
 
       if (!isSupabaseConfigured()) {
+        if (isSeoIntent) setCurrentView(intent);
         if (intent === "reset") setCurrentView("password-reset");
         if (intent === "demo") setCurrentView("tool-demo");
         if (intent === "team") setCurrentView("team-login");
@@ -9632,6 +9803,11 @@ export default function App() {
 
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        if (isSeoIntent) {
+          setCurrentView(intent);
+          setCheckingAuth(false);
+          return;
+        }
         if (session?.user) {
           if (intent === "demo") {
             setCurrentView("tool-demo");
@@ -9741,6 +9917,22 @@ export default function App() {
     return () => window.removeEventListener("popstate", onPopState);
   }, [teamUser, practiceUser]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const seoConfig = seoPages[currentView];
+    const title = seoConfig?.title || "DeFyb — Defying the Death of Private Practice";
+    const description = seoConfig?.description || "Revenue capture and coding intelligence for small practices.";
+    document.title = title;
+
+    let metaDescription = document.querySelector('meta[name=\"description\"]');
+    if (!metaDescription) {
+      metaDescription = document.createElement("meta");
+      metaDescription.setAttribute("name", "description");
+      document.head.appendChild(metaDescription);
+    }
+    metaDescription.setAttribute("content", description);
+  }, [currentView]);
+
   const handleTeamLogin = (user) => {
     if (!isTeamUser(user)) {
       if (isSupabaseConfigured()) {
@@ -9834,6 +10026,18 @@ export default function App() {
           onLogin={handleRequestTeamAccess}
           onClientLogin={handleRequestPracticeAccess}
           onDemoStart={handleStartDemo}
+        />
+      )}
+      {(currentView === "seo-multi-clinic" || currentView === "seo-ortho-capture" || currentView === "seo-underbilling-tool") && (
+        <MarketingLandingPage
+          kicker={seoPages[currentView].kicker}
+          title={seoPages[currentView].headline}
+          subtitle={seoPages[currentView].subtitle}
+          bullets={seoPages[currentView].bullets}
+          faqs={seoPages[currentView].faqs}
+          onClientLogin={handleRequestPracticeAccess}
+          onDemoStart={handleStartDemo}
+          onBack={() => setCurrentView("public")}
         />
       )}
       {currentView === "practice-login" && (

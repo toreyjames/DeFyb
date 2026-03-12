@@ -6659,11 +6659,14 @@ const PracticeLogin = ({ onLogin, onBack }) => {
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ width: "100%", maxWidth: "390px", margin: "20px" }}>
+      <Card style={{ width: "100%", maxWidth: "420px", margin: "20px" }}>
         <div style={{ textAlign: "center", marginBottom: "24px" }}>
           <DeFybLogo size={32} />
           <div style={{ fontFamily: DS.fonts.mono, fontSize: "11px", color: DS.colors.vital, marginTop: "8px", letterSpacing: "0.1em" }}>
             PRACTICE ACCESS
+          </div>
+          <div style={{ marginTop: "10px", fontSize: "14px", color: DS.colors.textMuted }}>
+            Sign in to your coding workspace.
           </div>
         </div>
 
@@ -6682,11 +6685,8 @@ const PracticeLogin = ({ onLogin, onBack }) => {
           </div>
         )}
 
-        <div style={{
-          fontSize: "11px", color: DS.colors.textDim, marginBottom: "14px",
-          textAlign: "center", textTransform: "uppercase", letterSpacing: "0.08em"
-        }}>
-          or sign in with email
+        <div style={{ fontSize: "11px", color: DS.colors.textDim, marginBottom: "14px", textAlign: "center", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          Email and password
         </div>
 
         <form onSubmit={handlePasswordLogin}>
@@ -6805,6 +6805,9 @@ const RevenueCaptureTool = ({ onBack }) => {
   const [encounterDetailLoading, setEncounterDetailLoading] = useState(false);
   const [dashboardMetrics, setDashboardMetrics] = useState(null);
   const [dashboardMetricsLoading, setDashboardMetricsLoading] = useState(false);
+  const [showBillingPanel, setShowBillingPanel] = useState(false);
+  const [showQueuePanel, setShowQueuePanel] = useState(false);
+  const [showAdvancedReview, setShowAdvancedReview] = useState(false);
   const draftStorageKey = "defyb:encounter-note-draft:v1";
 
   const copyText = async (label, text) => {
@@ -7502,7 +7505,19 @@ const RevenueCaptureTool = ({ onBack }) => {
         <div style={{ marginBottom: "10px", fontSize: "12px", color: DS.colors.textMuted }}>
           Clinic-safe mode: encounter notes in this tool are not sent to analytics.
         </div>
+        <div style={{ marginBottom: "12px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <Button small onClick={() => setShowBillingPanel((v) => !v)}>
+            {showBillingPanel ? "Hide Billing Panel" : "Show Billing Panel"}
+          </Button>
+          <Button small onClick={() => setShowQueuePanel((v) => !v)}>
+            {showQueuePanel ? "Hide Queue Mode" : "Show Queue Mode"}
+          </Button>
+          <Button small onClick={() => setShowAdvancedReview((v) => !v)}>
+            {showAdvancedReview ? "Hide Advanced Review" : "Show Advanced Review"}
+          </Button>
+        </div>
 
+        {showBillingPanel && (
         <Card style={{ marginBottom: "14px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: "12px", flexWrap: "wrap" }}>
             <div>
@@ -7585,7 +7600,9 @@ const RevenueCaptureTool = ({ onBack }) => {
             </div>
           </div>
         </Card>
+        )}
 
+        {showQueuePanel && (
         <Card style={{ marginBottom: "14px" }}>
           <div style={{ fontWeight: 600, marginBottom: "8px" }}>Queue Mode (Rapid Review)</div>
           <div style={{ fontSize: "12px", color: DS.colors.textMuted, marginBottom: "8px" }}>
@@ -7646,6 +7663,7 @@ const RevenueCaptureTool = ({ onBack }) => {
             </div>
           )}
         </Card>
+        )}
 
         <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "14px" }}>
           <Card>
@@ -8087,119 +8105,127 @@ const RevenueCaptureTool = ({ onBack }) => {
                         <div style={{ marginTop: "4px", fontSize: "11px", color: DS.colors.textDim, fontFamily: DS.fonts.mono }}>
                           {h.modelVersion || "rules-v1.0"}
                         </div>
-                        <div style={{ marginTop: "8px", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
-                          <select
-                            value={reviewDrafts[h.id]?.reviewStatus ?? h.reviewStatus ?? "pending"}
-                            onChange={(e) => setReviewField(h.id, "reviewStatus", e.target.value)}
-                            style={{
-                              padding: "6px 8px",
-                              borderRadius: DS.radius.sm,
-                              border: `1px solid ${DS.colors.borderLight}`,
-                              background: DS.colors.bgCard,
-                              color: DS.colors.text,
-                              fontSize: "12px",
-                            }}
-                          >
-                            <option value="pending">Review pending</option>
-                            <option value="agree">Agree with suggestion</option>
-                            <option value="disagree">Disagree</option>
-                          </select>
-                          <select
-                            value={reviewDrafts[h.id]?.reviewerCode ?? h.reviewerCode ?? ""}
-                            onChange={(e) => setReviewField(h.id, "reviewerCode", e.target.value)}
-                            style={{
-                              padding: "6px 8px",
-                              borderRadius: DS.radius.sm,
-                              border: `1px solid ${DS.colors.borderLight}`,
-                              background: DS.colors.bgCard,
-                              color: DS.colors.text,
-                              fontSize: "12px",
-                            }}
-                          >
-                            <option value="">Reviewer final code</option>
-                            <option value="99213">99213</option>
-                            <option value="99214">99214</option>
-                            <option value="99215">99215</option>
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => saveReview({ ...h, reviewStatus: "agree", reviewerCode: h.suggestedCode })}
-                            style={{
-                              padding: "6px 10px",
-                              borderRadius: DS.radius.sm,
-                              border: `1px solid ${DS.colors.vital}`,
-                              background: DS.colors.vitalDim,
-                              color: DS.colors.vital,
-                              cursor: "pointer",
-                              fontSize: "12px",
-                            }}
-                          >
-                            Quick Agree
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => saveReview({ ...h, reviewStatus: "disagree", reviewerCode: h.billedCode || "" })}
-                            style={{
-                              padding: "6px 10px",
-                              borderRadius: DS.radius.sm,
-                              border: `1px solid ${DS.colors.warn}`,
-                              background: DS.colors.warnDim,
-                              color: DS.colors.warn,
-                              cursor: "pointer",
-                              fontSize: "12px",
-                            }}
-                          >
-                            Quick Disagree
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => saveReview(h)}
-                            style={{
-                              padding: "6px 10px",
-                              borderRadius: DS.radius.sm,
-                              border: `1px solid ${DS.colors.borderLight}`,
-                              background: DS.colors.bgCard,
-                              color: DS.colors.text,
-                              cursor: "pointer",
-                              fontSize: "12px",
-                            }}
-                          >
-                            Save review
-                          </button>
-                          {h.encounterId && (
-                            <button
-                              type="button"
-                              onClick={() => loadEncounterDetail(h.encounterId)}
+                        {showAdvancedReview ? (
+                          <>
+                            <div style={{ marginTop: "8px", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                              <select
+                                value={reviewDrafts[h.id]?.reviewStatus ?? h.reviewStatus ?? "pending"}
+                                onChange={(e) => setReviewField(h.id, "reviewStatus", e.target.value)}
+                                style={{
+                                  padding: "6px 8px",
+                                  borderRadius: DS.radius.sm,
+                                  border: `1px solid ${DS.colors.borderLight}`,
+                                  background: DS.colors.bgCard,
+                                  color: DS.colors.text,
+                                  fontSize: "12px",
+                                }}
+                              >
+                                <option value="pending">Review pending</option>
+                                <option value="agree">Agree with suggestion</option>
+                                <option value="disagree">Disagree</option>
+                              </select>
+                              <select
+                                value={reviewDrafts[h.id]?.reviewerCode ?? h.reviewerCode ?? ""}
+                                onChange={(e) => setReviewField(h.id, "reviewerCode", e.target.value)}
+                                style={{
+                                  padding: "6px 8px",
+                                  borderRadius: DS.radius.sm,
+                                  border: `1px solid ${DS.colors.borderLight}`,
+                                  background: DS.colors.bgCard,
+                                  color: DS.colors.text,
+                                  fontSize: "12px",
+                                }}
+                              >
+                                <option value="">Reviewer final code</option>
+                                <option value="99213">99213</option>
+                                <option value="99214">99214</option>
+                                <option value="99215">99215</option>
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => saveReview({ ...h, reviewStatus: "agree", reviewerCode: h.suggestedCode })}
+                                style={{
+                                  padding: "6px 10px",
+                                  borderRadius: DS.radius.sm,
+                                  border: `1px solid ${DS.colors.vital}`,
+                                  background: DS.colors.vitalDim,
+                                  color: DS.colors.vital,
+                                  cursor: "pointer",
+                                  fontSize: "12px",
+                                }}
+                              >
+                                Quick Agree
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => saveReview({ ...h, reviewStatus: "disagree", reviewerCode: h.billedCode || "" })}
+                                style={{
+                                  padding: "6px 10px",
+                                  borderRadius: DS.radius.sm,
+                                  border: `1px solid ${DS.colors.warn}`,
+                                  background: DS.colors.warnDim,
+                                  color: DS.colors.warn,
+                                  cursor: "pointer",
+                                  fontSize: "12px",
+                                }}
+                              >
+                                Quick Disagree
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => saveReview(h)}
+                                style={{
+                                  padding: "6px 10px",
+                                  borderRadius: DS.radius.sm,
+                                  border: `1px solid ${DS.colors.borderLight}`,
+                                  background: DS.colors.bgCard,
+                                  color: DS.colors.text,
+                                  cursor: "pointer",
+                                  fontSize: "12px",
+                                }}
+                              >
+                                Save review
+                              </button>
+                              {h.encounterId && (
+                                <button
+                                  type="button"
+                                  onClick={() => loadEncounterDetail(h.encounterId)}
+                                  style={{
+                                    padding: "6px 10px",
+                                    borderRadius: DS.radius.sm,
+                                    border: `1px solid ${DS.colors.blue}`,
+                                    background: DS.colors.blueDim,
+                                    color: DS.colors.blue,
+                                    cursor: "pointer",
+                                    fontSize: "12px",
+                                  }}
+                                >
+                                  View Encounter Detail
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              type="text"
+                              value={reviewDrafts[h.id]?.reviewerNotes ?? h.reviewerNotes ?? ""}
+                              onChange={(e) => setReviewField(h.id, "reviewerNotes", e.target.value)}
+                              placeholder="Reviewer notes (optional)"
                               style={{
-                                padding: "6px 10px",
+                                width: "100%",
+                                marginTop: "8px",
+                                padding: "6px 8px",
                                 borderRadius: DS.radius.sm,
-                                border: `1px solid ${DS.colors.blue}`,
-                                background: DS.colors.blueDim,
-                                color: DS.colors.blue,
-                                cursor: "pointer",
+                                border: `1px solid ${DS.colors.borderLight}`,
+                                background: DS.colors.bgCard,
+                                color: DS.colors.text,
                                 fontSize: "12px",
                               }}
-                            >
-                              View Encounter Detail
-                            </button>
-                          )}
-                        </div>
-                        <input
-                          type="text"
-                          value={reviewDrafts[h.id]?.reviewerNotes ?? h.reviewerNotes ?? ""}
-                          onChange={(e) => setReviewField(h.id, "reviewerNotes", e.target.value)}
-                          placeholder="Reviewer notes (optional)"
-                          style={{
-                            width: "100%",
-                            marginTop: "8px",
-                            padding: "6px 8px",
-                            borderRadius: DS.radius.sm,
-                            border: `1px solid ${DS.colors.borderLight}`,
-                            background: DS.colors.bgCard,
-                            color: DS.colors.text,
-                            fontSize: "12px",
-                          }}
-                        />
+                            />
+                          </>
+                        ) : (
+                          <div style={{ marginTop: "8px", fontSize: "12px", color: DS.colors.textDim }}>
+                            Quick mode active. Enable Advanced Review for reviewer controls and encounter detail.
+                          </div>
+                        )}
                       </div>
                       <div style={{ fontSize: "12px", color: DS.colors.vital, fontWeight: 500 }}>
                         +${h.estimatedDeltaPerVisit}/visit

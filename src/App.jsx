@@ -5486,6 +5486,7 @@ const TeamDashboard = ({ onBack }) => {
   const handleClaimDecision = async (requestId, status) => {
     if (!isSupabaseConfigured()) return;
     try {
+      const target = claimRequests.find((r) => r.id === requestId);
       const { error } = await supabase
         .from("clinic_claim_requests")
         .update({
@@ -5494,6 +5495,18 @@ const TeamDashboard = ({ onBack }) => {
         })
         .eq("id", requestId);
       if (error) throw error;
+      if (target) {
+        supabase.functions.invoke("clinic-claim-notify", {
+          body: {
+            event: "decision",
+            status,
+            clinicName: target.clinic_name,
+            ownerEmail: target.owner_email,
+            requesterName: target.requester_name || null,
+            requesterEmail: target.requester_email || null,
+          },
+        }).catch(() => {});
+      }
       await refreshClaimRequests();
     } catch (err) {
       console.error("claim request update error:", err);
@@ -7179,6 +7192,16 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
 
       if (insertError) throw insertError;
       if (data) setClaimRequest(data);
+      supabase.functions.invoke("clinic-claim-notify", {
+        body: {
+          event: "submitted",
+          clinicName: clinicName,
+          ownerEmail: ownerEmail,
+          requesterName: payload.requester_name,
+          requesterEmail: payload.requester_email,
+          notes: payload.notes,
+        },
+      }).catch(() => {});
       setShowClaimForm(false);
       setCopied("Claim request sent");
       setTimeout(() => setCopied(""), 1400);

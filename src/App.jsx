@@ -6831,6 +6831,13 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
   const [includeImplementation, setIncludeImplementation] = useState(false);
   const [providerCount, setProviderCount] = useState(1);
   const [activeProviders, setActiveProviders] = useState(1);
+  const [claimRequest, setClaimRequest] = useState(null);
+  const [showClaimForm, setShowClaimForm] = useState(false);
+  const [claimSubmitting, setClaimSubmitting] = useState(false);
+  const [claimClinicName, setClaimClinicName] = useState("");
+  const [claimRequesterName, setClaimRequesterName] = useState("");
+  const [claimOwnerEmail, setClaimOwnerEmail] = useState("");
+  const [claimNotes, setClaimNotes] = useState("");
   const [reviewDrafts, setReviewDrafts] = useState({});
   const [queueInput, setQueueInput] = useState("");
   const [queueItems, setQueueItems] = useState([]);
@@ -6848,6 +6855,13 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
   const [showAdvancedReview, setShowAdvancedReview] = useState(false);
   const draftStorageKey = "defyb:encounter-note-draft:v1";
   const effectiveDemoMode = demoMode || !isSupabaseConfigured();
+  const hasPaidWorkspace = Boolean(
+    billingProfile?.stripe_subscription_id
+      || ["active", "trialing"].includes(String(billingProfile?.billing_status || "").toLowerCase())
+  );
+  const claimStatus = String(claimRequest?.status || "").toLowerCase();
+  const isClaimApproved = claimStatus === "approved";
+  const isProvisionalWorkspace = !effectiveDemoMode && !hasPaidWorkspace && !isClaimApproved;
 
   const copyText = async (label, text) => {
     if (!text) return;
@@ -6953,9 +6967,26 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
         setActiveProviders(Math.max(1, Number(data.active_provider_count || data.licensed_provider_count || 1)));
       }
     };
+    const loadClaimRequest = async () => {
+      if (effectiveDemoMode) return;
+      try {
+        const { data } = await supabase
+          .from("clinic_claim_requests")
+          .select("id, clinic_name, owner_email, requester_name, notes, status, submitted_at, reviewed_at")
+          .order("submitted_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (data) {
+          setClaimRequest(data);
+        }
+      } catch {
+        // Claim requests are optional until migration is applied.
+      }
+    };
 
     loadHistory();
     loadBillingProfile();
+    loadClaimRequest();
   }, [effectiveDemoMode]);
 
   const startSubscriptionCheckout = async () => {
@@ -7004,6 +7035,58 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
       active_provider_count: safeActive,
       licensed_provider_count: safeLicensed,
     }));
+  };
+
+  const submitClinicClaimRequest = async () => {
+    if (effectiveDemoMode || !isSupabaseConfigured()) return;
+    const clinicName = claimClinicName.trim();
+    const ownerEmail = claimOwnerEmail.trim().toLowerCase();
+    if (!clinicName || !ownerEmail) {
+      setError("Clinic name and owner/admin email are required to submit claim.");
+      return;
+    }
+    if (!ownerEmail.includes("@")) {
+      setError("Use a valid owner/admin email.");
+      return;
+    }
+    setClaimSubmitting(true);
+    setError(null);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+      if (!user) throw new Error("Sign in required.");
+
+      const payload = {
+        requester_user_id: user.id,
+        requester_email: user.email || "",
+        requester_name: claimRequesterName.trim() || null,
+        clinic_name: clinicName,
+        owner_email: ownerEmail,
+        notes: claimNotes.trim() || null,
+        source: "practice_tool",
+      };
+
+      const { data, error: insertError } = await supabase
+        .from("clinic_claim_requests")
+        .insert(payload)
+        .select("id, clinic_name, owner_email, requester_name, notes, status, submitted_at, reviewed_at")
+        .single();
+
+      if (insertError) throw insertError;
+      if (data) setClaimRequest(data);
+      setShowClaimForm(false);
+      setCopied("Claim request sent");
+      setTimeout(() => setCopied(""), 1400);
+    } catch (claimError) {
+      const msg = String(claimError?.message || "");
+      if (msg.toLowerCase().includes("relation") && msg.toLowerCase().includes("clinic_claim_requests")) {
+        window.location.href = `mailto:torey@defyb.org?subject=Clinic%20Claim%20Request&body=Clinic:%20${encodeURIComponent(clinicName)}%0AOwner%20Email:%20${encodeURIComponent(ownerEmail)}`;
+        return;
+      }
+      setError(msg || "Could not submit clinic claim request.");
+    } finally {
+      setClaimSubmitting(false);
+    }
   };
 
   const openBillingPortal = async () => {
@@ -7598,6 +7681,75 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
         <div style={{ marginBottom: "10px", fontSize: "12px", color: DS.colors.textMuted }}>
           Clinic-safe mode: encounter notes in this tool are not sent to analytics.
         </div>
+        {isProvisionalWorkspace && (
+          <div style={{
+            marginBottom: "12px",
+            padding: "12px",
+            borderRadius: DS.radius.md,
+            border: `1px solid ${DS.colors.warn}`,
+            background: DS.colors.warnDim,
+            fontSize: "12px",
+            color: DS.colors.text,
+          }}>
+            Provisional workspace: provider-start mode is active. Billing owner/admin must claim this clinic to unlock full controls.
+            {claimRequest?.submitted_at ? (
+              <span style={{ marginLeft: "8px", color: DS.colors.warn, fontWeight: 700 }}>
+                Claim status: {claimStatus || "pending"} (submitted {new Date(claimRequest.submitted_at).toLocaleDateString()})
+              </span>
+            ) : (
+              <span
+                onClick={() => setShowClaimForm((v) => !v)}
+                style={{ marginLeft: "8px", color: DS.colors.shock, fontWeight: 700, cursor: "pointer" }}
+              >
+                {showClaimForm ? "Hide claim form" : "Claim clinic workspace →"}
+              </span>
+            )}
+          </div>
+        )}
+        {isProvisionalWorkspace && showClaimForm && (
+          <Card style={{ marginBottom: "12px" }}>
+            <div style={{ fontWeight: 600, marginBottom: "8px" }}>Claim Clinic Workspace</div>
+            <div style={{ fontSize: "12px", color: DS.colors.textMuted, marginBottom: "8px" }}>
+              Submit owner/admin contact so DeFyb can move this account from provisional to full clinic ownership.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "8px" }}>
+              <input
+                type="text"
+                value={claimClinicName}
+                onChange={(e) => setClaimClinicName(e.target.value)}
+                placeholder="Clinic legal name"
+                style={{ padding: "10px 12px", borderRadius: DS.radius.sm, border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bg, color: DS.colors.text }}
+              />
+              <input
+                type="text"
+                value={claimRequesterName}
+                onChange={(e) => setClaimRequesterName(e.target.value)}
+                placeholder="Your name (optional)"
+                style={{ padding: "10px 12px", borderRadius: DS.radius.sm, border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bg, color: DS.colors.text }}
+              />
+              <input
+                type="email"
+                value={claimOwnerEmail}
+                onChange={(e) => setClaimOwnerEmail(e.target.value)}
+                placeholder="Owner/Admin email"
+                style={{ padding: "10px 12px", borderRadius: DS.radius.sm, border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bg, color: DS.colors.text }}
+              />
+              <input
+                type="text"
+                value={claimNotes}
+                onChange={(e) => setClaimNotes(e.target.value)}
+                placeholder="Notes (optional)"
+                style={{ padding: "10px 12px", borderRadius: DS.radius.sm, border: `1px solid ${DS.colors.borderLight}`, background: DS.colors.bg, color: DS.colors.text }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+              <Button primary small onClick={() => !claimSubmitting && submitClinicClaimRequest()} style={{ opacity: claimSubmitting ? 0.7 : 1 }}>
+                {claimSubmitting ? "Submitting..." : "Submit Claim Request"}
+              </Button>
+              <Button small onClick={() => setShowClaimForm(false)}>Cancel</Button>
+            </div>
+          </Card>
+        )}
         {effectiveDemoMode && (
           <div style={{
             marginBottom: "12px",
@@ -7626,7 +7778,18 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
           <Button small onClick={() => setShowQueuePanel((v) => !v)}>
             {showQueuePanel ? "Hide Queue Mode" : "Show Queue Mode"}
           </Button>
-          <Button small onClick={() => setShowAdvancedReview((v) => !v)}>
+          <Button
+            small
+            onClick={() => {
+              if (isProvisionalWorkspace) {
+                setCopied("Advanced review unlocks after clinic claim");
+                setTimeout(() => setCopied(""), 1400);
+                return;
+              }
+              setShowAdvancedReview((v) => !v);
+            }}
+            style={{ opacity: isProvisionalWorkspace ? 0.6 : 1 }}
+          >
             {showAdvancedReview ? "Hide Advanced Review" : "Show Advanced Review"}
           </Button>
         </div>
@@ -7702,7 +7865,11 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
               </label>
             </div>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              {billingProfile?.stripe_subscription_id ? (
+              {isProvisionalWorkspace ? (
+                <Button primary onClick={() => setShowClaimForm(true)}>
+                  Claim Workspace to Enable Billing
+                </Button>
+              ) : billingProfile?.stripe_subscription_id ? (
                 <Button primary onClick={() => !billingLoading && openBillingPortal()} style={{ opacity: billingLoading ? 0.7 : 1 }}>
                   {billingLoading ? "Opening..." : "Manage Billing"}
                 </Button>
@@ -8108,7 +8275,18 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
                   <Button small onClick={() => copyText("Copied billing summary", billingSummary)}>
                     Copy Billing Summary
                   </Button>
-                  <Button small onClick={exportJustificationPdf}>
+                  <Button
+                    small
+                    onClick={() => {
+                      if (isProvisionalWorkspace) {
+                        setCopied("PDF export unlocks after clinic claim");
+                        setTimeout(() => setCopied(""), 1400);
+                        return;
+                      }
+                      exportJustificationPdf();
+                    }}
+                    style={{ opacity: isProvisionalWorkspace ? 0.6 : 1 }}
+                  >
                     Download Justification PDF
                   </Button>
                   <Button

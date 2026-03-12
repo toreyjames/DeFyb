@@ -91,37 +91,37 @@ const ConfigProvider = ({ children }) => {
 // --- DESIGN SYSTEM ---
 const DS = {
   colors: {
-    bg: "#f3f6f9",
+    bg: "#f0f4f7",
     bgCard: "#ffffff",
-    bgHover: "#edf2f7",
-    border: "#d7dee7",
-    borderLight: "#c3ceda",
-    text: "#1f2a36",
-    textMuted: "#5f6f7f",
-    textDim: "#8694a3",
-    shock: "#2f5d7c",
-    shockGlow: "#2f5d7c1f",
-    shockLight: "#6b8ba4",
-    vital: "#2e7d5b",
-    vitalDim: "#2e7d5b1f",
-    warn: "#a66d18",
-    warnDim: "#a66d181f",
-    danger: "#b54747",
-    dangerDim: "#b547471f",
-    blue: "#3f6d8d",
-    blueDim: "#3f6d8d1f",
+    bgHover: "#e8edf3",
+    border: "#ccd6e2",
+    borderLight: "#b8c7d8",
+    text: "#132332",
+    textMuted: "#4e6276",
+    textDim: "#75889b",
+    shock: "#1f4e70",
+    shockGlow: "#1f4e701f",
+    shockLight: "#2f6e99",
+    vital: "#1f7a58",
+    vitalDim: "#1f7a581f",
+    warn: "#8f5b14",
+    warnDim: "#8f5b141f",
+    danger: "#a03636",
+    dangerDim: "#a036361f",
+    blue: "#2f678f",
+    blueDim: "#2f678f1f",
     white: "#ffffff",
   },
   fonts: {
-    display: "'Lora', Georgia, serif",
-    body: "'Source Sans 3', 'Segoe UI', sans-serif",
+    display: "'Fraunces', Georgia, serif",
+    body: "'Manrope', 'Segoe UI', sans-serif",
     mono: "'IBM Plex Mono', monospace",
   },
   radius: { sm: "6px", md: "10px", lg: "16px", xl: "24px" },
   shadow: {
-    card: "0 6px 20px rgba(26, 39, 54, 0.06)",
-    glow: "0 0 30px rgba(47, 93, 124, 0.12)",
-    deep: "0 12px 36px rgba(26, 39, 54, 0.1)",
+    card: "0 10px 26px rgba(19, 35, 50, 0.08)",
+    glow: "0 0 30px rgba(31, 78, 112, 0.15)",
+    deep: "0 16px 40px rgba(19, 35, 50, 0.15)",
   },
 };
 
@@ -135,7 +135,7 @@ const TAGS = {
 // --- FONTS LOADER ---
 const FontLoader = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
   `}</style>
 );
 
@@ -145,7 +145,9 @@ const GlobalStyles = () => (
     * { margin:0; padding:0; box-sizing:border-box; }
     html { scroll-behavior:smooth; }
     body {
-      background: linear-gradient(180deg, #f9fbfd 0%, ${DS.colors.bg} 180px, ${DS.colors.bg} 100%);
+      background:
+        radial-gradient(circle at 18% -4%, #ffffff 0%, #f6f9fc 36%, ${DS.colors.bg} 74%),
+        repeating-linear-gradient(90deg, transparent 0, transparent 43px, rgba(31, 78, 112, 0.03) 44px);
       color:${DS.colors.text};
       font-family:${DS.fonts.body};
       line-height:1.6;
@@ -156,6 +158,7 @@ const GlobalStyles = () => (
     ::-webkit-scrollbar-track { background:${DS.colors.bg}; }
     ::-webkit-scrollbar-thumb { background:${DS.colors.borderLight}; border-radius:3px; }
     input, textarea, select { font-family:${DS.fonts.body}; }
+    button { font-family:${DS.fonts.body}; }
     @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
     @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
@@ -248,12 +251,13 @@ const Tag = ({ type }) => {
 const Button = ({ children, primary, small, onClick, style: s = {} }) => (
   <button onClick={onClick} style={{
     padding: small ? "8px 16px" : "12px 28px",
-    background: primary ? DS.colors.shock : "transparent",
+    background: primary ? `linear-gradient(140deg, ${DS.colors.shock}, ${DS.colors.shockLight})` : DS.colors.bgCard,
     color: primary ? "#fff" : DS.colors.text,
     border: `1px solid ${primary ? DS.colors.shock : DS.colors.borderLight}`,
     borderRadius: DS.radius.md, cursor: "pointer",
     fontFamily: DS.fonts.body, fontSize: small ? "13px" : "15px",
-    fontWeight: 600, letterSpacing: "0.005em",
+    fontWeight: 700, letterSpacing: "0.01em",
+    boxShadow: primary ? DS.shadow.glow : "none",
     transition: "all 0.2s ease", ...s,
   }}>{children}</button>
 );
@@ -261,6 +265,7 @@ const Button = ({ children, primary, small, onClick, style: s = {} }) => (
 const Card = ({ children, style: s = {} }) => (
   <div style={{
     background: DS.colors.bgCard, border: `1px solid ${DS.colors.border}`,
+    borderTop: `2px solid ${DS.colors.shockGlow}`,
     borderRadius: DS.radius.lg, padding: "24px", boxShadow: DS.shadow.card, ...s,
   }}>{children}</div>
 );
@@ -269,7 +274,7 @@ const SectionTitle = ({ children, sub }) => (
   <div style={{ marginBottom: "32px" }}>
     <h2 style={{
       fontFamily: DS.fonts.display, fontSize: "clamp(28px, 4vw, 40px)",
-      color: DS.colors.text, fontWeight: 400, lineHeight: 1.2, marginBottom: sub ? "8px" : 0,
+      color: DS.colors.text, fontWeight: 600, lineHeight: 1.15, letterSpacing: "-0.02em", marginBottom: sub ? "8px" : 0,
     }}>{children}</h2>
     {sub && <p style={{ color: DS.colors.textMuted, fontSize: "16px", maxWidth: "600px" }}>{sub}</p>}
   </div>
@@ -3909,15 +3914,32 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
         padding: "120px 24px 60px",
       }}>
         <div style={{ width: "100%", maxWidth: "920px", textAlign: "center" }}>
+          <div style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+            fontSize: "11px",
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: DS.colors.shock,
+            marginBottom: "14px",
+            padding: "6px 10px",
+            borderRadius: "999px",
+            border: `1px solid ${DS.colors.border}`,
+            background: DS.colors.bgCard,
+          }}>
+            Revenue Capture OS for Private Practices
+          </div>
           <h1 style={{
             fontFamily: DS.fonts.display, fontSize: "clamp(34px, 6vw, 64px)",
-            lineHeight: 1.1, marginBottom: "18px",
+            lineHeight: 1.03, marginBottom: "18px", letterSpacing: "-0.03em", fontWeight: 650,
           }}>
-            Defying the death of small practices.
+            Defying the slow bleed of small practices.
           </h1>
           <p style={{ fontSize: "18px", color: DS.colors.textMuted, marginBottom: "28px" }}>
-            DeFyb finds underbilling in your encounter documentation and shows what to fix so doctors save time and get paid correctly.
+            DeFyb catches underbilling from encounter documentation and shows exactly what to fix, so doctors protect margin without adding clicks.
           </p>
+          <HeartbeatLine width={220} style={{ margin: "0 auto 24px" }} />
           <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
             <Button primary onClick={onClientLogin}>Login to Start the Tool →</Button>
             <Button onClick={() => window.location.href = "mailto:torey@defyb.org?subject=DeFyb%20Practice%20Access"}>
@@ -3940,6 +3962,9 @@ const PublicSite = ({ onLogin, onClientLogin }) => {
               </div>
               <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
                 Coding capture core: encounter analysis, code suggestion, documentation gap closure.
+              </div>
+              <div style={{ marginTop: "10px", fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase", color: DS.colors.shock }}>
+                Built for underbilling recovery first
               </div>
             </Card>
 
@@ -6659,14 +6684,20 @@ const PracticeLogin = ({ onLogin, onBack }) => {
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ width: "100%", maxWidth: "420px", margin: "20px" }}>
+      <Card style={{
+        width: "100%",
+        maxWidth: "420px",
+        margin: "20px",
+        borderTop: `3px solid ${DS.colors.shock}`,
+        background: `linear-gradient(180deg, ${DS.colors.bgCard}, #fbfdff)`,
+      }}>
         <div style={{ textAlign: "center", marginBottom: "24px" }}>
           <DeFybLogo size={32} />
           <div style={{ fontFamily: DS.fonts.mono, fontSize: "11px", color: DS.colors.vital, marginTop: "8px", letterSpacing: "0.1em" }}>
             PRACTICE ACCESS
           </div>
           <div style={{ marginTop: "10px", fontSize: "14px", color: DS.colors.textMuted }}>
-            Sign in to your coding workspace.
+            Sign in to the revenue capture workspace.
           </div>
         </div>
 
@@ -8479,7 +8510,13 @@ const TeamLogin = ({ onLogin, onBack }) => {
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ width: "100%", maxWidth: "380px", margin: "20px" }}>
+      <Card style={{
+        width: "100%",
+        maxWidth: "380px",
+        margin: "20px",
+        borderTop: `3px solid ${DS.colors.shock}`,
+        background: `linear-gradient(180deg, ${DS.colors.bgCard}, #fbfdff)`,
+      }}>
         <div style={{ textAlign: "center", marginBottom: "24px" }}>
           <DeFybLogo size={32} />
           <div style={{
@@ -8664,7 +8701,13 @@ const PasswordResetView = ({ onDone }) => {
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ width: "100%", maxWidth: "420px", margin: "20px" }}>
+      <Card style={{
+        width: "100%",
+        maxWidth: "420px",
+        margin: "20px",
+        borderTop: `3px solid ${DS.colors.shock}`,
+        background: `linear-gradient(180deg, ${DS.colors.bgCard}, #fbfdff)`,
+      }}>
         <div style={{ textAlign: "center", marginBottom: "24px" }}>
           <DeFybLogo size={32} />
           <div style={{ fontFamily: DS.fonts.mono, fontSize: "11px", color: DS.colors.vital, marginTop: "8px", letterSpacing: "0.1em" }}>

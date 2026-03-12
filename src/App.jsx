@@ -6954,6 +6954,8 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
   const [includeImplementation, setIncludeImplementation] = useState(false);
   const [providerCount, setProviderCount] = useState(1);
   const [activeProviders, setActiveProviders] = useState(1);
+  const [clinicMemberships, setClinicMemberships] = useState([]);
+  const [activePracticeId, setActivePracticeId] = useState(null);
   const [claimRequest, setClaimRequest] = useState(null);
   const [showClaimForm, setShowClaimForm] = useState(false);
   const [claimSubmitting, setClaimSubmitting] = useState(false);
@@ -6977,6 +6979,7 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
   const [showQueuePanel, setShowQueuePanel] = useState(false);
   const [showAdvancedReview, setShowAdvancedReview] = useState(false);
   const draftStorageKey = "defyb:encounter-note-draft:v1";
+  const practiceStorageKey = "defyb:active-practice-id:v1";
   const activationSyncRef = useRef(false);
   const effectiveDemoMode = demoMode || !isSupabaseConfigured();
   const hasPaidWorkspace = Boolean(
@@ -6998,6 +7001,12 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
       setTimeout(() => setCopied(""), 1400);
     }
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!activePracticeId) return;
+    window.localStorage.setItem(practiceStorageKey, activePracticeId);
+  }, [activePracticeId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -7071,7 +7080,8 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
   const loadHistory = async () => {
     if (effectiveDemoMode) return;
     try {
-      const payload = await invokeEncountersApi("/encounters?limit=20", "GET");
+      const practiceQuery = activePracticeId ? `&practice_id=${encodeURIComponent(activePracticeId)}` : "";
+      const payload = await invokeEncountersApi(`/encounters?limit=20${practiceQuery}`, "GET");
       setHistory(mapEncounterListToHistory(payload?.encounters || []));
     } catch (historyError) {
       console.warn("history unavailable:", historyError?.message || historyError);
@@ -7107,11 +7117,50 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
         // Claim requests are optional until migration is applied.
       }
     };
+    const loadClinicMemberships = async () => {
+      if (effectiveDemoMode) return;
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+      if (!user) return;
+      const { data, error } = await supabase
+        .from("clinic_memberships")
+        .select("practice_id, clinic_name, role, is_default, status")
+        .eq("auth_user_id", user.id)
+        .eq("status", "active")
+        .order("is_default", { ascending: false });
+      if (!error && data && data.length > 0) {
+        setClinicMemberships(data);
+        const savedPractice = typeof window !== "undefined" ? window.localStorage.getItem(practiceStorageKey) : null;
+        const selected = data.find((m) => m.practice_id === savedPractice)?.practice_id
+          || data.find((m) => m.is_default)?.practice_id
+          || data[0].practice_id;
+        setActivePracticeId(selected || null);
+        return;
+      }
 
+      // Backward compatibility fallback to single-practice app_users row.
+      const { data: appUserRow } = await supabase
+        .from("app_users")
+        .select("practice_id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (appUserRow?.practice_id) {
+        setClinicMemberships([{ practice_id: appUserRow.practice_id, clinic_name: "Clinic", role: "provider", is_default: true, status: "active" }]);
+        setActivePracticeId(appUserRow.practice_id);
+      }
+    };
+
+    loadClinicMemberships();
     loadHistory();
     loadBillingProfile();
     loadClaimRequest();
   }, [effectiveDemoMode]);
+
+  useEffect(() => {
+    if (effectiveDemoMode) return;
+    loadHistory();
+    loadDashboardMetrics();
+  }, [activePracticeId, effectiveDemoMode]);
 
   const startSubscriptionCheckout = async () => {
     if (!isSupabaseConfigured()) {
@@ -7302,7 +7351,8 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
     if (effectiveDemoMode) return;
     try {
       setDashboardMetricsLoading(true);
-      const metrics = await invokeEncountersApi("/dashboard/metrics", "GET");
+      const practiceQuery = activePracticeId ? `?practice_id=${encodeURIComponent(activePracticeId)}` : "";
+      const metrics = await invokeEncountersApi(`/dashboard/metrics${practiceQuery}`, "GET");
       setDashboardMetrics(metrics || null);
     } catch (metricsError) {
       console.warn("dashboard metrics unavailable:", metricsError?.message || metricsError);
@@ -7401,7 +7451,11 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
           encounterId: null,
         };
       } else {
+        if (!activePracticeId) {
+          throw new Error("Select a clinic before running analysis.");
+        }
         const created = await invokeEncountersApi("/encounters", "POST", {
+          practice_id: activePracticeId || undefined,
           encounter_date: encounterDate,
           visit_type: "office_followup",
           patient_type: patientType,
@@ -7857,7 +7911,30 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
         background: `${DS.colors.bg}ee`, backdropFilter: "blur(12px)",
         borderBottom: `1px solid ${DS.colors.border}`,
       }}>
-        <DeFybLogo size={24} />
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <DeFybLogo size={24} />
+          {!effectiveDemoMode && clinicMemberships.length > 0 && (
+            <select
+              value={activePracticeId || ""}
+              onChange={(e) => setActivePracticeId(e.target.value || null)}
+              style={{
+                padding: "6px 10px",
+                borderRadius: DS.radius.sm,
+                border: `1px solid ${DS.colors.borderLight}`,
+                background: DS.colors.bgCard,
+                color: DS.colors.text,
+                fontSize: "12px",
+                minWidth: "180px",
+              }}
+            >
+              {clinicMemberships.map((m) => (
+                <option key={m.practice_id} value={m.practice_id}>
+                  {m.clinic_name || `Clinic ${String(m.practice_id).slice(0, 8)}`}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
         <span onClick={onBack} style={{ fontSize: "13px", color: DS.colors.textMuted, cursor: "pointer" }}>
           {effectiveDemoMode ? "Exit Demo" : "Sign out"}
         </span>
@@ -7867,6 +7944,11 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
         <SectionTitle sub="Paste encounter documentation and get billing intelligence in seconds.">
           Revenue Capture Tool
         </SectionTitle>
+        {!effectiveDemoMode && clinicMemberships.length > 0 && (
+          <div style={{ marginBottom: "8px", fontSize: "12px", color: DS.colors.textMuted }}>
+            Active clinic: <span style={{ color: DS.colors.text }}>{clinicMemberships.find((m) => m.practice_id === activePracticeId)?.clinic_name || "Unspecified clinic"}</span>
+          </div>
+        )}
         <div style={{ marginBottom: "10px", fontSize: "12px", color: DS.colors.textMuted }}>
           Clinic-safe mode: encounter notes in this tool are not sent to analytics.
         </div>

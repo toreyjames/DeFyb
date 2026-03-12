@@ -204,6 +204,20 @@ serve(async (req) => {
       .maybeSingle();
 
     const teamRole = isTeamRole(user as unknown as Record<string, unknown>);
+    const { data: memberships } = await client
+      .from("clinic_memberships")
+      .select("practice_id, role, status")
+      .eq("auth_user_id", user.id)
+      .eq("status", "active");
+    const allowedPracticeIds = new Set<string>(
+      [
+        ...((memberships || []).map((m) => String(m.practice_id)).filter(Boolean)),
+        ...(appUser?.practice_id ? [String(appUser.practice_id)] : []),
+      ],
+    );
+    const defaultPracticeId = ((memberships || [])[0]?.practice_id || appUser?.practice_id || null) as string | null;
+    const hasPracticeAccess = (practiceId: string | null | undefined) =>
+      Boolean(practiceId) && (teamRole || allowedPracticeIds.has(String(practiceId)));
 
     const emitAudit = async (
       practiceId: string,
@@ -223,9 +237,9 @@ serve(async (req) => {
     // POST /encounters
     if (req.method === "POST" && route.length === 1 && route[0] === "encounters") {
       const body = await req.json();
-      const practiceId = body.practice_id || appUser?.practice_id;
+      const practiceId = body.practice_id || defaultPracticeId;
       if (!practiceId) return json(400, { error: "practice_id is required" });
-      if (!teamRole && !appUser) return json(403, { error: "No practice membership found" });
+      if (!hasPracticeAccess(practiceId)) return json(403, { error: "No access to practice" });
 
       const payload = {
         practice_id: practiceId,
@@ -260,6 +274,7 @@ serve(async (req) => {
         .eq("id", encounterId)
         .single();
       if (encounterError || !encounter) return json(404, { error: "Encounter not found" });
+      if (!hasPracticeAccess(encounter.practice_id)) return json(403, { error: "No access to practice" });
 
       const { error: noteError } = await client.from("encounter_notes").insert({
         encounter_id: encounterId,
@@ -287,6 +302,7 @@ serve(async (req) => {
         .eq("id", encounterId)
         .single();
       if (encounterError || !encounter) return json(404, { error: "Encounter not found" });
+      if (!hasPracticeAccess(encounter.practice_id)) return json(403, { error: "No access to practice" });
 
       const { data: noteRow } = await client
         .from("encounter_notes")
@@ -414,6 +430,7 @@ serve(async (req) => {
         .eq("id", encounterId)
         .single();
       if (encounterError || !encounter) return json(404, { error: "Encounter not found" });
+      if (!hasPracticeAccess(encounter.practice_id)) return json(403, { error: "No access to practice" });
 
       const { data: latestRec, error: recError } = await client
         .from("code_recommendations")
@@ -462,6 +479,7 @@ serve(async (req) => {
         .eq("id", encounterId)
         .single();
       if (encounterError || !encounter) return json(404, { error: "Encounter not found" });
+      if (!hasPracticeAccess(encounter.practice_id)) return json(403, { error: "No access to practice" });
 
       const { data: latestRec, error: recError } = await client
         .from("code_recommendations")
@@ -511,6 +529,7 @@ serve(async (req) => {
         .eq("id", encounterId)
         .single();
       if (encounterError || !encounter) return json(404, { error: "Encounter not found" });
+      if (!hasPracticeAccess(encounter.practice_id)) return json(403, { error: "No access to practice" });
 
       const { data: notes } = await client
         .from("encounter_notes")
@@ -552,8 +571,9 @@ serve(async (req) => {
       const query = new URL(req.url).searchParams;
       const practiceIdParam = query.get("practice_id");
       const limit = Math.min(100, Math.max(1, Number(query.get("limit") || "20")));
-      const practiceId = practiceIdParam || appUser?.practice_id;
+      const practiceId = practiceIdParam || defaultPracticeId;
       if (!practiceId) return json(400, { error: "practice_id is required" });
+      if (!hasPracticeAccess(practiceId)) return json(403, { error: "No access to practice" });
 
       const { data: encounters, error: encounterError } = await client
         .from("encounters")
@@ -602,8 +622,9 @@ serve(async (req) => {
     // GET /dashboard/metrics?practice_id=uuid
     if (req.method === "GET" && route.length === 2 && route[0] === "dashboard" && route[1] === "metrics") {
       const practiceIdParam = new URL(req.url).searchParams.get("practice_id");
-      const practiceId = practiceIdParam || appUser?.practice_id;
+      const practiceId = practiceIdParam || defaultPracticeId;
       if (!practiceId) return json(400, { error: "practice_id is required" });
+      if (!hasPracticeAccess(practiceId)) return json(403, { error: "No access to practice" });
 
       const { data: encounterRows } = await client
         .from("encounters")

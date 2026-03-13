@@ -14,6 +14,25 @@ type CheckoutRequest = {
   providerCount?: number;
 };
 
+const ADDON_PRICE_ENV_MAP: Record<string, { monthly: string; setup: string }> = {
+  claims: {
+    monthly: "STRIPE_ADDON_CLAIMS_MONTHLY_PRICE_ID",
+    setup: "STRIPE_ADDON_CLAIMS_SETUP_PRICE_ID",
+  },
+  prior_auth: {
+    monthly: "STRIPE_ADDON_PRIOR_AUTH_MONTHLY_PRICE_ID",
+    setup: "STRIPE_ADDON_PRIOR_AUTH_SETUP_PRICE_ID",
+  },
+  dme: {
+    monthly: "STRIPE_ADDON_DME_MONTHLY_PRICE_ID",
+    setup: "STRIPE_ADDON_DME_SETUP_PRICE_ID",
+  },
+  scribe_connector: {
+    monthly: "STRIPE_ADDON_SCRIBE_CONNECTOR_MONTHLY_PRICE_ID",
+    setup: "STRIPE_ADDON_SCRIBE_CONNECTOR_SETUP_PRICE_ID",
+  },
+};
+
 const coreRateForProviderCount = (providerCount: number) => {
   if (providerCount >= 21) return 249;
   if (providerCount >= 6) return 279;
@@ -146,6 +165,25 @@ serve(async (req) => {
     if (includeImplementation && implementationPriceId) {
       params.set(`line_items[${lineIdx}][price]`, implementationPriceId);
       params.set(`line_items[${lineIdx}][quantity]`, "1");
+      lineIdx += 1;
+    }
+
+    for (const addonId of selectedAddons) {
+      const envNames = ADDON_PRICE_ENV_MAP[addonId];
+      if (!envNames) continue;
+      const monthlyPriceId = Deno.env.get(envNames.monthly);
+      const setupPriceId = Deno.env.get(envNames.setup);
+      if (!monthlyPriceId || !setupPriceId) {
+        throw new Error(`Stripe add-on pricing not configured for: ${addonId}`);
+      }
+
+      params.set(`line_items[${lineIdx}][price]`, monthlyPriceId);
+      params.set(`line_items[${lineIdx}][quantity]`, String(providerCount));
+      lineIdx += 1;
+
+      params.set(`line_items[${lineIdx}][price]`, setupPriceId);
+      params.set(`line_items[${lineIdx}][quantity]`, "1");
+      lineIdx += 1;
     }
 
     params.set("success_url", `${origin}/tool?billing=success&session_id={CHECKOUT_SESSION_ID}`);

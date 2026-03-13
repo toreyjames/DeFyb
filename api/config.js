@@ -6,37 +6,27 @@ import { get, getAll } from '@vercel/edge-config';
 // Default configuration (fallback if Edge Config not set)
 const defaultConfig = {
   aiTools: [
-    { id: "suki", name: "Suki AI Scribe", category: "scribe", cost: 299 },
-    { id: "ambience", name: "Ambience Scribe", category: "scribe", cost: 299 },
-    { id: "healos", name: "HealOS Scribe", category: "scribe", cost: 199 },
-    { id: "assort", name: "Assort Health Phone", category: "phone", cost: 650 },
-    { id: "claims", name: "Claims AI", category: "revenue", cost: 300 },
-    { id: "pa", name: "PA Automation", category: "workflow", cost: 450 },
-    { id: "dme", name: "DME In-House Program", category: "revenue", cost: 0 },
+    { id: "coding_core", name: "DeFyb Coding Core", category: "revenue", cost: 299 },
+    { id: "claims", name: "Claims AI (Optional)", category: "revenue", cost: 99 },
+    { id: "prior_auth", name: "Prior Auth Automation (Optional)", category: "workflow", cost: 149 },
+    { id: "dme", name: "DME Workflow (Optional)", category: "revenue", cost: 199 },
+    { id: "scribe_connector", name: "Scribe Connector (Optional)", category: "integration", cost: 49 },
   ],
   pricing: {
-    assessment: {
-      base: 2500,
-      waivableWithContract: true,
+    core: {
+      platformMinimumMonthly: 599,
+      implementationFee: 2500,
+      tiers: [
+        { min: 1, max: 5, perProviderMonthly: 299 },
+        { min: 6, max: 20, perProviderMonthly: 279 },
+        { min: 21, max: 999, perProviderMonthly: 249 },
+      ],
     },
-    implementation: {
-      base: 5000,
-      perProvider: 1500,
-      perTool: 500,
-      ehrComplexity: {
-        standard: 1.0,
-        moderate: 1.25,
-        complex: 1.5,
-      },
-      specialtyComplexity: {
-        standard: 1.0,
-        surgical: 1.15,
-        behavioral: 1.15,
-      },
-    },
-    monthly: {
-      base: 500,
-      perProvider: 200,
+    addons: {
+      claims: { monthlyPerProvider: 99, implementationFee: 750 },
+      prior_auth: { monthlyPerProvider: 149, implementationFee: 1000 },
+      dme: { monthlyPerProvider: 199, implementationFee: 1500 },
+      scribe_connector: { monthlyPerProvider: 49, implementationFee: 500 },
     },
   },
   roiBenchmarks: {

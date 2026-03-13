@@ -23,32 +23,27 @@ const useConfig = () => {
 const DEFAULT_CONFIG = {
   aiTools: [
     { id: "coding_core", name: "DeFyb Coding Core", category: "revenue", cost: 299 },
-    { id: "suki", name: "Suki AI Scribe", category: "scribe", cost: 299 },
-    { id: "ambience", name: "Ambience (Optional Scribe)", category: "scribe", cost: 299 },
-    { id: "healos", name: "HealOS (Optional Scribe)", category: "scribe", cost: 199 },
-    { id: "abridge", name: "Abridge (Optional Scribe)", category: "scribe", cost: 350 },
-    { id: "dax", name: "Nuance DAX (Optional Scribe)", category: "scribe", cost: 650 },
-    { id: "nabla", name: "Nabla (Optional Scribe)", category: "scribe", cost: 249 },
-    { id: "deepscribe", name: "DeepScribe (Optional Scribe)", category: "scribe", cost: 249 },
-    { id: "augmedix", name: "Augmedix (Optional Scribe)", category: "scribe", cost: 399 },
-    { id: "freed", name: "Freed (Optional Scribe)", category: "scribe", cost: 99 },
-    { id: "heidi", name: "Heidi (Optional Scribe)", category: "scribe", cost: 99 },
-    { id: "dragon", name: "Microsoft Dragon Copilot (Optional Scribe)", category: "scribe", cost: 699 },
-    { id: "assort", name: "Assort Health Phone", category: "phone", cost: 650 },
-    { id: "claims", name: "Claims AI", category: "revenue", cost: 300 },
-    { id: "pa", name: "PA Automation", category: "workflow", cost: 450 },
-    { id: "dme", name: "DME In-House Program", category: "revenue", cost: 0 },
+    { id: "claims", name: "Claims AI (Optional)", category: "revenue", cost: 99 },
+    { id: "prior_auth", name: "Prior Auth Automation (Optional)", category: "workflow", cost: 149 },
+    { id: "dme", name: "DME Workflow (Optional)", category: "revenue", cost: 199 },
+    { id: "scribe_connector", name: "Scribe Connector (Optional)", category: "integration", cost: 49 },
   ],
   pricing: {
-    assessment: { base: 2500, waivableWithContract: true },
-    implementation: {
-      base: 5000,
-      perProvider: 1500,
-      perTool: 500,
-      ehrComplexity: { standard: 1.0, moderate: 1.25, complex: 1.5 },
-      specialtyComplexity: { standard: 1.0, surgical: 1.15, behavioral: 1.15 },
+    core: {
+      platformMinimumMonthly: 599,
+      implementationFee: 2500,
+      tiers: [
+        { min: 1, max: 5, perProviderMonthly: 299 },
+        { min: 6, max: 20, perProviderMonthly: 279 },
+        { min: 21, max: 999, perProviderMonthly: 249 },
+      ],
     },
-    monthly: { base: 500, perProvider: 200 },
+    addons: {
+      claims: { monthlyPerProvider: 99, implementationFee: 750 },
+      prior_auth: { monthlyPerProvider: 149, implementationFee: 1000 },
+      dme: { monthlyPerProvider: 199, implementationFee: 1500 },
+      scribe_connector: { monthlyPerProvider: 49, implementationFee: 500 },
+    },
   },
   source: "defaults",
 };
@@ -147,6 +142,36 @@ const trackEvent = (eventName, props = {}) => {
   } catch {
     // no-op
   }
+};
+
+const CORE_PRICING = {
+  platformMinimumMonthly: 599,
+  implementationFee: 2500,
+  tiers: [
+    { min: 1, max: 5, perProviderMonthly: 299 },
+    { min: 6, max: 20, perProviderMonthly: 279 },
+    { min: 21, max: Infinity, perProviderMonthly: 249 },
+  ],
+};
+
+const OPTIONAL_ADDONS = [
+  { id: "claims", name: "Claims AI", monthly: 99, implementation: 750, perProvider: true },
+  { id: "prior_auth", name: "Prior Auth Automation", monthly: 149, implementation: 1000, perProvider: true },
+  { id: "dme", name: "DME Workflow", monthly: 199, implementation: 1500, perProvider: true },
+  { id: "scribe_connector", name: "Scribe Connector", monthly: 49, implementation: 500, perProvider: true },
+];
+
+const resolveCorePerProviderRate = (providerCount) => {
+  const safeProviderCount = Math.max(1, Number(providerCount || 1));
+  const tier = CORE_PRICING.tiers.find((t) => safeProviderCount >= t.min && safeProviderCount <= t.max)
+    || CORE_PRICING.tiers[0];
+  return tier.perProviderMonthly;
+};
+
+const calculateCoreMonthly = (providerCount) => {
+  const safeProviderCount = Math.max(1, Number(providerCount || 1));
+  const rate = resolveCorePerProviderRate(safeProviderCount);
+  return Math.max(CORE_PRICING.platformMinimumMonthly, rate * safeProviderCount);
 };
 
 // --- FONTS LOADER ---
@@ -4034,13 +4059,13 @@ const PublicSite = ({ onLogin, onClientLogin, onDemoStart }) => {
                 Baseline Plan
               </div>
               <div style={{ fontFamily: DS.fonts.display, fontSize: "30px", lineHeight: 1.1, margin: "6px 0" }}>
-                $299<span style={{ fontSize: "16px", color: DS.colors.textMuted }}>/mo</span>
+                $299<span style={{ fontSize: "16px", color: DS.colors.textMuted }}>/provider/mo</span>
               </div>
               <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
-                Coding capture core: encounter analysis, code suggestion, documentation gap closure.
+                Tiered core pricing: $299 (1-5), $279 (6-20), $249 (21+) with a $599 clinic minimum.
               </div>
               <div style={{ marginTop: "10px", fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase", color: DS.colors.shock }}>
-                Built for underbilling recovery first
+                One-time core implementation: $2,500
               </div>
             </Card>
 
@@ -4061,10 +4086,10 @@ const PublicSite = ({ onLogin, onClientLogin, onDemoStart }) => {
                 Optional Add-Ons
               </div>
               <div style={{ fontFamily: DS.fonts.display, fontSize: "24px", lineHeight: 1.1, margin: "8px 0 10px" }}>
-                DME, Prior Auth, Claims
+                Claims, Prior Auth, DME, Scribe Connector
               </div>
               <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
-                Layer only after baseline coding lift is proven in your workflow.
+                Claims $99, Prior Auth $149, DME $199, Scribe Connector $49 (all per provider/month).
               </div>
             </Card>
           </div>
@@ -7220,6 +7245,7 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
   const [billingProfile, setBillingProfile] = useState(null);
   const [billingLoading, setBillingLoading] = useState(false);
   const [includeImplementation, setIncludeImplementation] = useState(false);
+  const [selectedAddons, setSelectedAddons] = useState([]);
   const [providerCount, setProviderCount] = useState(1);
   const [activeProviders, setActiveProviders] = useState(1);
   const [clinicMemberships, setClinicMemberships] = useState([]);
@@ -7257,6 +7283,11 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
   const claimStatus = String(claimRequest?.status || "").toLowerCase();
   const isClaimApproved = claimStatus === "approved";
   const isProvisionalWorkspace = !effectiveDemoMode && !hasPaidWorkspace && !isClaimApproved;
+  const toggleAddon = (addonId) => {
+    setSelectedAddons((prev) => (
+      prev.includes(addonId) ? prev.filter((id) => id !== addonId) : [...prev, addonId]
+    ));
+  };
 
   const copyText = async (label, text) => {
     if (!text) return;
@@ -7442,6 +7473,7 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
         body: {
           origin: window.location.origin,
           includeImplementation,
+          selectedAddons,
           providerCount,
         },
       });
@@ -7849,8 +7881,16 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
   ].join("\n") : "";
 
   const noteAdditions = analysis ? analysis.suggestions.join("\n") : "";
-  const additionalProviders = Math.max(0, providerCount - 1);
-  const monthlyEstimate = 299 + (additionalProviders * 199);
+  const corePerProviderRate = resolveCorePerProviderRate(providerCount);
+  const coreMonthlyEstimate = calculateCoreMonthly(providerCount);
+  const selectedAddonDetails = OPTIONAL_ADDONS.filter((addon) => selectedAddons.includes(addon.id));
+  const addonsMonthlyEstimate = selectedAddonDetails.reduce(
+    (sum, addon) => sum + (addon.perProvider ? addon.monthly * providerCount : addon.monthly),
+    0
+  );
+  const addonsImplementationEstimate = selectedAddonDetails.reduce((sum, addon) => sum + addon.implementation, 0);
+  const monthlyEstimate = coreMonthlyEstimate + addonsMonthlyEstimate;
+  const upfrontEstimate = (includeImplementation ? CORE_PRICING.implementationFee : 0) + addonsImplementationEstimate;
   const overLimit = activeProviders > providerCount;
   const reviewedCases = history.filter((h) => h.reviewStatus && h.reviewStatus !== "pending");
   const agreeCases = reviewedCases.filter((h) => h.reviewStatus === "agree");
@@ -8366,7 +8406,7 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
             <div>
               <div style={{ fontWeight: 600, marginBottom: "4px" }}>Subscription</div>
               <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
-                Baseline Coding Plan: <strong style={{ color: DS.colors.text }}>$299/mo</strong>
+                Core Coding Guardrail: <strong style={{ color: DS.colors.text }}>${corePerProviderRate}/provider/mo</strong> (tiered)
                 {billingProfile?.stripe_subscription_id && (
                   <span style={{ marginLeft: "8px", color: DS.colors.vital }}>
                     • {billingProfile.billing_status || "active"}
@@ -8407,9 +8447,33 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
                 <Button small onClick={() => !billingLoading && saveSeatUsage()}>Save Seats</Button>
               </div>
               <div style={{ marginTop: "8px", fontSize: "12px", color: DS.colors.textMuted }}>
-                Monthly estimate: <strong style={{ color: DS.colors.text }}>${monthlyEstimate}/mo</strong>
-                {additionalProviders > 0 && (
-                  <span> ({additionalProviders} additional at $199/provider)</span>
+                Core monthly: <strong style={{ color: DS.colors.text }}>${coreMonthlyEstimate}/mo</strong>
+                <span> ({providerCount} provider{providerCount === 1 ? "" : "s"} at ${corePerProviderRate}, min ${CORE_PRICING.platformMinimumMonthly})</span>
+              </div>
+              <div style={{ marginTop: "6px", fontSize: "12px", color: DS.colors.textMuted }}>
+                Optional add-ons:
+              </div>
+              <div style={{ marginTop: "6px", display: "grid", gap: "6px" }}>
+                {OPTIONAL_ADDONS.map((addon) => (
+                  <label key={addon.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: DS.colors.textMuted }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedAddons.includes(addon.id)}
+                      onChange={() => toggleAddon(addon.id)}
+                      disabled={billingLoading}
+                    />
+                    {addon.name}: +${addon.monthly}/provider/mo and ${addon.implementation} one-time
+                  </label>
+                ))}
+              </div>
+              <div style={{ marginTop: "8px", fontSize: "12px", color: DS.colors.textMuted }}>
+                Total monthly estimate: <strong style={{ color: DS.colors.text }}>${monthlyEstimate}/mo</strong>
+                {addonsMonthlyEstimate > 0 && <span> (includes ${addonsMonthlyEstimate}/mo add-ons)</span>}
+              </div>
+              <div style={{ marginTop: "4px", fontSize: "12px", color: DS.colors.textMuted }}>
+                One-time estimate: <strong style={{ color: DS.colors.text }}>${upfrontEstimate}</strong>
+                {upfrontEstimate > 0 && (
+                  <span> ({includeImplementation ? `$${CORE_PRICING.implementationFee} core` : "core implementation not selected"}{addonsImplementationEstimate > 0 ? ` + $${addonsImplementationEstimate} add-ons` : ""})</span>
                 )}
               </div>
               {overLimit && (
@@ -8427,7 +8491,7 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
                   onChange={(e) => setIncludeImplementation(e.target.checked)}
                   disabled={billingLoading || !!billingProfile?.stripe_subscription_id}
                 />
-                Add one-time implementation fee (+$1,500) at checkout (optional)
+                Add core implementation fee (+${CORE_PRICING.implementationFee}) at checkout
               </label>
             </div>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -8441,11 +8505,16 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
                 </Button>
               ) : (
                 <Button primary onClick={() => !billingLoading && startSubscriptionCheckout()} style={{ opacity: billingLoading ? 0.7 : 1 }}>
-                  {billingLoading ? "Starting..." : "Start $299 Subscription"}
+                  {billingLoading ? "Starting..." : "Start Core Subscription"}
                 </Button>
               )}
             </div>
           </div>
+          {selectedAddons.length > 0 && (
+            <div style={{ marginTop: "10px", fontSize: "12px", color: DS.colors.textDim }}>
+              Add-ons are selected and tracked in checkout metadata. If add-on Stripe prices are not yet configured, they can be activated after core subscription.
+            </div>
+          )}
         </Card>
         )}
 

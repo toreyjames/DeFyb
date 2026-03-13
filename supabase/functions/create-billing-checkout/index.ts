@@ -9,8 +9,15 @@ const corsHeaders = {
 type CheckoutRequest = {
   origin?: string;
   includeImplementation?: boolean;
+  selectedAddons?: string[];
   practiceId?: string;
   providerCount?: number;
+};
+
+const coreRateForProviderCount = (providerCount: number) => {
+  if (providerCount >= 21) return 249;
+  if (providerCount >= 6) return 279;
+  return 299;
 };
 
 const stripeRequest = async (path: string, body?: URLSearchParams, method = "POST") => {
@@ -62,18 +69,29 @@ serve(async (req) => {
 
     const payload = (await req.json().catch(() => ({}))) as CheckoutRequest;
     const includeImplementation = !!payload.includeImplementation;
+    const selectedAddons = Array.isArray(payload.selectedAddons)
+      ? payload.selectedAddons.filter(Boolean).slice(0, 8)
+      : [];
     const providerCount = Math.max(1, Math.min(200, Number(payload.providerCount || 1)));
-    const additionalProviders = Math.max(0, providerCount - 1);
     const origin = payload.origin?.startsWith("http") ? payload.origin : "https://defyb.org";
+
+    const corePriceTier1To5 = Deno.env.get("STRIPE_CORE_1_5_PRICE_ID");
+    const corePriceTier6To20 = Deno.env.get("STRIPE_CORE_6_20_PRICE_ID");
+    const corePriceTier21Plus = Deno.env.get("STRIPE_CORE_21_PLUS_PRICE_ID");
+    const platformMinimumPriceId = Deno.env.get("STRIPE_PLATFORM_MINIMUM_PRICE_ID");
 
     const baselinePriceId = Deno.env.get("STRIPE_BASELINE_PRICE_ID");
     const implementationPriceId = Deno.env.get("STRIPE_IMPLEMENTATION_PRICE_ID");
     const additionalProviderPriceId = Deno.env.get("STRIPE_ADDITIONAL_PROVIDER_PRICE_ID");
-    if (!baselinePriceId) throw new Error("STRIPE_BASELINE_PRICE_ID is not configured");
+
+    const hasTieredCorePrices = Boolean(corePriceTier1To5 && corePriceTier6To20 && corePriceTier21Plus);
+    if (!hasTieredCorePrices && !baselinePriceId) {
+      throw new Error("Stripe core pricing is not configured");
+    }
     if (includeImplementation && !implementationPriceId) {
       throw new Error("Implementation fee is not configured yet. Contact support.");
     }
-    if (additionalProviders > 0 && !additionalProviderPriceId) {
+    if (!hasTieredCorePrices && providerCount > 1 && !additionalProviderPriceId) {
       throw new Error("Additional provider pricing is not configured yet. Contact support.");
     }
 
@@ -97,14 +115,32 @@ serve(async (req) => {
     const params = new URLSearchParams();
     params.set("mode", "subscription");
     params.set("customer", stripeCustomerId);
-    params.set("line_items[0][price]", baselinePriceId);
-    params.set("line_items[0][quantity]", "1");
 
-    let lineIdx = 1;
-    if (additionalProviders > 0 && additionalProviderPriceId) {
-      params.set(`line_items[${lineIdx}][price]`, additionalProviderPriceId);
-      params.set(`line_items[${lineIdx}][quantity]`, String(additionalProviders));
+    let lineIdx = 0;
+    if (hasTieredCorePrices) {
+      const tieredCorePriceId = providerCount >= 21
+        ? corePriceTier21Plus
+        : providerCount >= 6
+          ? corePriceTier6To20
+          : corePriceTier1To5;
+      params.set(`line_items[${lineIdx}][price]`, String(tieredCorePriceId));
+      params.set(`line_items[${lineIdx}][quantity]`, String(providerCount));
       lineIdx += 1;
+      if (platformMinimumPriceId) {
+        params.set(`line_items[${lineIdx}][price]`, platformMinimumPriceId);
+        params.set(`line_items[${lineIdx}][quantity]`, "1");
+        lineIdx += 1;
+      }
+    } else {
+      const additionalProviders = Math.max(0, providerCount - 1);
+      params.set(`line_items[${lineIdx}][price]`, String(baselinePriceId));
+      params.set(`line_items[${lineIdx}][quantity]`, "1");
+      lineIdx += 1;
+      if (additionalProviders > 0 && additionalProviderPriceId) {
+        params.set(`line_items[${lineIdx}][price]`, additionalProviderPriceId);
+        params.set(`line_items[${lineIdx}][quantity]`, String(additionalProviders));
+        lineIdx += 1;
+      }
     }
 
     if (includeImplementation && implementationPriceId) {
@@ -118,8 +154,13 @@ serve(async (req) => {
     params.set("metadata[user_id]", user.id);
     params.set("metadata[include_implementation]", String(includeImplementation));
     params.set("metadata[provider_count]", String(providerCount));
+    params.set("metadata[selected_addons]", selectedAddons.join(","));
+    params.set("metadata[core_rate]", String(coreRateForProviderCount(providerCount)));
+    params.set("metadata[platform_minimum]", "599");
 
     const session = await stripeRequest("checkout/sessions", params);
+
+    const coreMonthly = Math.max(599, coreRateForProviderCount(providerCount) * providerCount);
 
     await userClient
       .from("billing_profiles")
@@ -130,7 +171,7 @@ serve(async (req) => {
         implementation_enabled: includeImplementation,
         licensed_provider_count: providerCount,
         active_provider_count: providerCount,
-        monthly_amount: 299 + (additionalProviders * 199),
+        monthly_amount: coreMonthly,
         updated_at: new Date().toISOString(),
       });
 

@@ -6918,28 +6918,119 @@ const TeamDashboard = ({ onBack }) => {
   );
 };
 
+const toDateOrNullLocal = (value) => {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const parseSurgeryDateFromNoteLocal = (noteText, encounterDateValue) => {
+  const note = noteText || "";
+  const marker = /(surgery date|date of surgery|dos|d\/o\/s|sx date|date of procedure|status post|s\/p|post[-\s]?op|postoperative)/i;
+  if (!marker.test(note)) return null;
+  const encounterDate = toDateOrNullLocal(encounterDateValue) || new Date();
+  const patterns = [
+    /(?:surgery date|date of surgery|dos|d\/o\/s|sx date|date of procedure)\s*[:\-]?\s*(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4})/i,
+    /(?:status post|s\/p|post[-\s]?op|postoperative)[^\n\r]{0,80}?(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4})/i,
+  ];
+  for (const p of patterns) {
+    const m = p.exec(note);
+    if (!m?.[1]) continue;
+    const parsed = toDateOrNullLocal(m[1]) || (() => {
+      const n = m[1].match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/);
+      if (!n) return null;
+      const mm = Number(n[1]);
+      const dd = Number(n[2]);
+      let yy = encounterDate.getFullYear();
+      if (n[3]) {
+        const rawYear = Number(n[3]);
+        yy = rawYear < 100 ? 2000 + rawYear : rawYear;
+      }
+      const candidate = new Date(yy, mm - 1, dd);
+      if (Number.isNaN(candidate.getTime())) return null;
+      if (!n[3] && candidate.getTime() > encounterDate.getTime()) candidate.setFullYear(candidate.getFullYear() - 1);
+      candidate.setHours(0, 0, 0, 0);
+      return candidate;
+    })();
+    if (parsed) return parsed;
+  }
+  return null;
+};
+
 const analyzeEncounterNote = (noteText, billedCode = "99213", context = {}) => {
   const normalized = (noteText || "").toLowerCase();
+  const isNewPatient = String(context?.patientType || "").toLowerCase() === "new";
+  const conservativeMode = context?.conservativeMode !== false;
+  const encounterDate = toDateOrNullLocal(context?.encounterDate) || new Date();
+  const surgeryDate = toDateOrNullLocal(context?.surgeryDate) || parseSurgeryDateFromNoteLocal(noteText, encounterDate);
+  const postOpLanguage = /(post[-\s]?op|postoperative|status post|s\/p|global period|follow[-\s]?up after surgery|after surgery|f\/u)/.test(normalized);
+  const postOpDays = surgeryDate ? Math.floor((encounterDate.getTime() - surgeryDate.getTime()) / (1000 * 60 * 60 * 24)) : null;
+  const isWithinGlobal = postOpDays != null && postOpDays >= 0 && postOpDays <= 90;
+
   const hasDataReview = /(mri|x-?ray|ct|imaging|lab|reviewed records|independent historian)/.test(normalized);
-  const hasProblemComplexity = /(chronic|worsening|exacerbation|persistent pain|multiple conditions)/.test(normalized);
+  const hasProblemComplexity = /(chronic|worsening|exacerbation|persistent pain|multiple conditions|new problem|acute)/.test(normalized);
   const hasManagementRisk = /(surgery|procedure|injection|prescription|medication management|opioid|high risk)/.test(normalized);
   const hasRiskDiscussion = /(risk|benefit|shared decision|alternatives|informed consent)/.test(normalized);
   const hasFollowUpPlan = /(follow-up|return in|plan|next steps|monitor)/.test(normalized);
-  const isNewPatient = String(context?.patientType || "").toLowerCase() === "new";
+  const evidenceCategories = [
+    hasProblemComplexity,
+    hasDataReview,
+    hasManagementRisk || hasRiskDiscussion,
+  ].filter(Boolean).length;
+
+  const evidenceFound = [];
+  if (hasProblemComplexity) evidenceFound.push("Problem complexity documented");
+  if (hasDataReview) evidenceFound.push("Data/imaging/lab review documented");
+  if (hasManagementRisk) evidenceFound.push("Management risk documented");
+  if (hasRiskDiscussion) evidenceFound.push("Risk-benefit discussion documented");
+  if (hasFollowUpPlan) evidenceFound.push("Follow-up plan documented");
+
+  const evidenceMissing = [];
+  if (!hasProblemComplexity) evidenceMissing.push("Problem status/complexity is weakly documented");
+  if (!hasDataReview) evidenceMissing.push("Data review (labs/imaging/records) is missing");
+  if (!hasRiskDiscussion) evidenceMissing.push("Risk/benefit discussion not explicit");
+  if (!hasFollowUpPlan) evidenceMissing.push("Follow-up plan/next steps missing");
 
   const rationale = [];
-  if (hasDataReview) rationale.push("Reviewed external/internal diagnostic data (imaging/labs/history).");
-  if (hasProblemComplexity) rationale.push("Problem complexity indicates moderate decision burden.");
-  if (hasManagementRisk) rationale.push("Management options include higher-risk treatment decisions.");
-  if (hasRiskDiscussion) rationale.push("Risk/benefit discussion is documented for management choices.");
-  if (hasFollowUpPlan) rationale.push("Assessment includes a clear ongoing treatment/follow-up plan.");
+  if (postOpLanguage && !surgeryDate) {
+    rationale.push("Post-op language detected but surgery date was not found.");
+  }
+  if (surgeryDate) {
+    rationale.push(`Surgery date considered: ${surgeryDate.toISOString().slice(0, 10)}.`);
+  }
+  rationale.push(`Evidence summary: categories=${evidenceCategories}, data_review=${hasDataReview ? "yes" : "no"}, problem_complexity=${hasProblemComplexity ? "yes" : "no"}, risk_discussion=${hasRiskDiscussion ? "yes" : "no"}, management_risk=${hasManagementRisk ? "yes" : "no"}.`);
 
   let suggestedCode = isNewPatient ? "99202" : "99213";
-  if (rationale.length >= 3) suggestedCode = isNewPatient ? "99203" : "99214";
-  if (rationale.length >= 5 || (hasManagementRisk && hasDataReview && hasRiskDiscussion)) suggestedCode = isNewPatient ? "99204" : "99215";
-  rationale.push(
-    `Evidence summary: data_review=${hasDataReview ? "yes" : "no"}, problem_complexity=${hasProblemComplexity ? "yes" : "no"}, risk_discussion=${hasRiskDiscussion ? "yes" : "no"}, management_risk=${hasManagementRisk ? "yes" : "no"}.`,
-  );
+  const moveUpRequirements = [];
+  const moveDownReasons = [];
+
+  if (isWithinGlobal) {
+    suggestedCode = "99024";
+    rationale.unshift(`Post-op global period detected (${postOpDays} days since surgery).`);
+  } else {
+    if (evidenceCategories >= 2 && (hasProblemComplexity || hasManagementRisk)) {
+      suggestedCode = isNewPatient ? "99203" : "99214";
+    }
+    if (evidenceCategories >= 3 && hasManagementRisk && hasRiskDiscussion && hasDataReview) {
+      suggestedCode = isNewPatient ? "99204" : "99215";
+    }
+    if (conservativeMode && evidenceCategories < 2) {
+      suggestedCode = isNewPatient ? "99202" : "99213";
+      moveDownReasons.push("Conservative mode held code due to limited evidence categories.");
+    }
+  }
+
+  if (suggestedCode === (isNewPatient ? "99202" : "99213")) {
+    moveUpRequirements.push("Add explicit data review and risk/benefit discussion for higher level support.");
+  }
+  if (suggestedCode === (isNewPatient ? "99203" : "99214")) {
+    moveUpRequirements.push("Document high-risk management + stronger data review to support top level.");
+  }
+  if ((suggestedCode === "99215" || suggestedCode === "99204") && evidenceCategories < 3) {
+    moveDownReasons.push("Top-level code selected but evidence categories are not all strongly represented.");
+  }
 
   const codeRank = { "99202": 1, "99203": 2, "99204": 3, "99213": 1, "99214": 2, "99215": 3 };
   const perVisitDelta = {
@@ -6951,32 +7042,33 @@ const analyzeEncounterNote = (noteText, billedCode = "99213", context = {}) => {
     "99214->99215": 74,
   };
 
-  const gaps = [];
+  const gaps = [...evidenceMissing];
+  if (postOpLanguage && !surgeryDate) gaps.push("Post-op context present but surgery date is not documented.");
   const suggestions = [];
-  if (!hasDataReview) {
-    gaps.push("Data review not clearly documented.");
-    suggestions.push("Reviewed relevant prior records and diagnostic data to inform clinical decision making.");
-  }
-  if (!hasRiskDiscussion) {
-    gaps.push("Risk/benefit discussion missing for selected management path.");
-    suggestions.push("Discussed risks and benefits of procedural and conservative treatment options with shared decision making.");
-  }
-  if (!hasFollowUpPlan) {
-    gaps.push("Follow-up plan or monitoring details are limited.");
-    suggestions.push("Documented follow-up timeline, return precautions, and criteria for escalation.");
-  }
+  if (!hasDataReview) suggestions.push("Document specific labs/imaging/records reviewed to support complexity.");
+  if (!hasRiskDiscussion) suggestions.push("Add risk/benefit and treatment alternatives discussion.");
+  if (!hasFollowUpPlan) suggestions.push("Add follow-up interval and escalation criteria.");
+  if (postOpLanguage && !surgeryDate) suggestions.push("Document surgery date in the encounter note for global-period determination.");
 
   const deltaKey = `${billedCode}->${suggestedCode}`;
   const estimatedDeltaPerVisit = codeRank[suggestedCode] > codeRank[billedCode] ? (perVisitDelta[deltaKey] || 0) : 0;
+  const confidenceRaw = 0.46 + (evidenceCategories * 0.12) + (hasRiskDiscussion ? 0.08 : 0) + (hasFollowUpPlan ? 0.05 : 0) + (isWithinGlobal ? 0.2 : 0);
+  const confidence = Math.max(0.52, Math.min(0.96, confidenceRaw - (conservativeMode && evidenceCategories < 2 ? 0.08 : 0)));
 
   return {
     suggestedCode,
     rationale,
-    confidence: Math.min(0.96, 0.52 + rationale.length * 0.1),
+    confidence,
     gaps,
     suggestions,
     estimatedDeltaPerVisit,
     estimatedMonthlyRecovery: estimatedDeltaPerVisit * 80,
+    evidenceFound,
+    evidenceMissing,
+    moveUpRequirements,
+    moveDownReasons,
+    postOpDays,
+    surgeryDateDetected: surgeryDate ? surgeryDate.toISOString().slice(0, 10) : null,
   };
 };
 
@@ -7240,6 +7332,7 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
   const [patientType, setPatientType] = useState("established");
   const [placeOfService, setPlaceOfService] = useState("office");
   const [codingPath, setCodingPath] = useState("mdm");
+  const [conservativeMode, setConservativeMode] = useState(true);
   const [totalMinutes, setTotalMinutes] = useState("");
   const [isTelehealth, setIsTelehealth] = useState(false);
   const [encounterDate, setEncounterDate] = useState(new Date().toISOString().slice(0, 10));
@@ -7342,7 +7435,7 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [analyzing, analysis, note, billedCode, specialty, patientType, placeOfService, codingPath, totalMinutes, isTelehealth, encounterDate, surgeryDate]);
+  }, [analyzing, analysis, note, billedCode, specialty, patientType, placeOfService, codingPath, totalMinutes, conservativeMode, isTelehealth, encounterDate, surgeryDate]);
 
   const mapEncounterListToHistory = (encounters = []) => (
     encounters.map((row) => {
@@ -7734,6 +7827,7 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
         placeOfService,
         codingPath,
         totalMinutes: codingPath === "time" ? Math.max(0, Number(totalMinutes || 0)) : null,
+        conservativeMode,
         telehealth: isTelehealth,
         encounterDate,
         surgeryDate: surgeryDate || null,
@@ -7742,22 +7836,6 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
       let mapped = null;
       if (effectiveDemoMode) {
         const local = analyzeEncounterNote(effectiveNote, billedCode, encounterContext);
-        const postopDetected = /(post[- ]?op|postoperative|status post|s\/p|global period|surgery follow-up|follow-up after surgery|f\/u)/i.test(effectiveNote);
-        if (postopDetected && surgeryDate && encounterDate) {
-          const surgeryTs = new Date(surgeryDate).getTime();
-          const encounterTs = new Date(encounterDate).getTime();
-          const dayDiff = Math.floor((encounterTs - surgeryTs) / (1000 * 60 * 60 * 24));
-          if (dayDiff >= 0 && dayDiff <= 90) {
-            local.suggestedCode = "99024";
-            local.estimatedDeltaPerVisit = 0;
-            local.estimatedMonthlyRecovery = 0;
-            local.rationale = [
-              "Encounter appears to be post-op follow-up within the 90-day global period.",
-              ...(local.rationale || []),
-            ];
-            local.gaps = (local.gaps || []).filter((g) => !/risk\/benefit/i.test(g));
-          }
-        }
         mapped = {
           id: `demo-${Date.now()}`,
           at: new Date().toLocaleString(),
@@ -7773,6 +7851,12 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
           rationale: local.rationale || [],
           gaps: local.gaps || [],
           suggestions: local.suggestions || [],
+          evidenceFound: local.evidenceFound || [],
+          evidenceMissing: local.evidenceMissing || [],
+          moveUpRequirements: local.moveUpRequirements || [],
+          moveDownReasons: local.moveDownReasons || [],
+          postOpDays: local.postOpDays ?? null,
+          surgeryDateDetected: local.surgeryDateDetected || null,
           estimatedMonthlyRecovery: Number(local.estimatedMonthlyRecovery || 0),
           reviewStatus: "pending",
           reviewerCode: "",
@@ -7823,7 +7907,7 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
           billedCode,
           suggestedCode: rec.suggested_code,
           recommendationId: rec.recommendation_id || null,
-          modelVersion: analyzed.rule_version || "rules-v1.0-em-core",
+          modelVersion: analyzed.rule_version || "rules-v1.1-em-core",
           encounterContext,
           confidence: confidenceMap[rec.confidence] || 0.75,
           estimatedDeltaPerVisit: Number(rev.delta_amount || 0),
@@ -7831,6 +7915,12 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
           rationale: rec.rationale || [],
           gaps: gapItems,
           suggestions: gapItems,
+          evidenceFound: [],
+          evidenceMissing: gapItems,
+          moveUpRequirements: [],
+          moveDownReasons: [],
+          postOpDays: null,
+          surgeryDateDetected: null,
           estimatedMonthlyRecovery: Number(rev.delta_amount || 0) * 80,
           reviewStatus: "pending",
           reviewerCode: "",
@@ -7850,6 +7940,12 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
         confidence: mapped.confidence,
         gaps: mapped.gaps,
         suggestions: mapped.suggestions,
+        evidenceFound: mapped.evidenceFound || [],
+        evidenceMissing: mapped.evidenceMissing || [],
+        moveUpRequirements: mapped.moveUpRequirements || [],
+        moveDownReasons: mapped.moveDownReasons || [],
+        postOpDays: mapped.postOpDays ?? null,
+        surgeryDateDetected: mapped.surgeryDateDetected || null,
         estimatedDeltaPerVisit: mapped.estimatedDeltaPerVisit,
         estimatedMonthlyRecovery: mapped.estimatedMonthlyRecovery,
       });
@@ -8820,6 +8916,16 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
                 />
                 Telehealth encounter
               </label>
+              {effectiveDemoMode && (
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: DS.colors.textMuted, paddingBottom: "10px" }}>
+                  <input
+                    type="checkbox"
+                    checked={conservativeMode}
+                    onChange={(e) => setConservativeMode(e.target.checked)}
+                  />
+                  Conservative demo mode (reduces high-level suggestions without strong evidence)
+                </label>
+              )}
               <Button primary onClick={() => !analyzing && runAnalysis()} style={{ opacity: analyzing ? 0.7 : 1 }}>
                 {analyzing ? "Analyzing..." : "Analyze Encounter"}
               </Button>
@@ -8858,6 +8964,12 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
                     fontSize: "12px",
                   }}>
                     Post-op global-period follow-up detected. 99024 is non-billable for visits within 90 days of surgery.
+                    {analysis.surgeryDateDetected && (
+                      <span style={{ display: "block", marginTop: "4px" }}>
+                        Surgery date used: {analysis.surgeryDateDetected}
+                        {analysis.postOpDays != null ? ` (${analysis.postOpDays} days from encounter date)` : ""}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -8967,6 +9079,38 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
                 </div>
               </div>
               <div style={{ display: "grid", gap: "8px" }}>
+                <div style={{
+                  padding: "8px",
+                  borderRadius: DS.radius.sm,
+                  border: `1px solid ${DS.colors.border}`,
+                  background: DS.colors.bg,
+                  display: "grid",
+                  gap: "6px",
+                }}>
+                  <div style={{ fontSize: "12px", color: DS.colors.textDim, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    Why This Code
+                  </div>
+                  {(analysis.evidenceFound || []).length > 0 && (
+                    <div style={{ fontSize: "12px", color: DS.colors.vital }}>
+                      Found: {(analysis.evidenceFound || []).join(" · ")}
+                    </div>
+                  )}
+                  {(analysis.evidenceMissing || []).length > 0 && (
+                    <div style={{ fontSize: "12px", color: DS.colors.warn }}>
+                      Missing: {(analysis.evidenceMissing || []).join(" · ")}
+                    </div>
+                  )}
+                  {(analysis.moveUpRequirements || []).length > 0 && (
+                    <div style={{ fontSize: "12px", color: DS.colors.shock }}>
+                      To move up: {(analysis.moveUpRequirements || []).join(" · ")}
+                    </div>
+                  )}
+                  {(analysis.moveDownReasons || []).length > 0 && (
+                    <div style={{ fontSize: "12px", color: DS.colors.warn }}>
+                      Downcode guardrail: {(analysis.moveDownReasons || []).join(" · ")}
+                    </div>
+                  )}
+                </div>
                 {analysis.rationale.map((item, i) => (
                   <div key={i} style={{ fontSize: "14px", color: DS.colors.textMuted }}>
                     • {item}

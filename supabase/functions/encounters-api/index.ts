@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const RULE_VERSION = "rules-v1.0-em-core";
+const RULE_VERSION = "rules-v1.1-em-core";
 
 type SignalBundle = {
   problems_addressed_count: number;
@@ -40,16 +40,56 @@ const isTeamRole = (claims: Record<string, unknown> | null | undefined) => {
 
 const normalizeNote = (raw: string) => raw.replace(/\s+/g, " ").trim();
 
-const parseSurgeryDate = (note: string): Date | null => {
-  const marker = /(surgery date|date of surgery|dos|d\/o\/s|sx date|status post|s\/p|post[-\s]?op)/i;
-  if (!marker.test(note)) return null;
-
-  const match = /(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4})/.exec(note);
-  if (!match?.[1]) return null;
-  const parsed = new Date(match[1]);
+const parseNumericDate = (value: string, encounterDate: Date): Date | null => {
+  const text = (value || "").trim();
+  if (!text) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    const parsed = new Date(text);
+    if (Number.isNaN(parsed.getTime())) return null;
+    parsed.setHours(0, 0, 0, 0);
+    return parsed;
+  }
+  const m = text.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/);
+  if (!m) return null;
+  const mm = Number(m[1]);
+  const dd = Number(m[2]);
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+  let yyyy = encounterDate.getFullYear();
+  if (m[3]) {
+    const y = Number(m[3]);
+    yyyy = y < 100 ? 2000 + y : y;
+  }
+  const parsed = new Date(Date.UTC(yyyy, mm - 1, dd));
   if (Number.isNaN(parsed.getTime())) return null;
-  parsed.setHours(0, 0, 0, 0);
-  return parsed;
+  const encounterUTC = new Date(Date.UTC(encounterDate.getFullYear(), encounterDate.getMonth(), encounterDate.getDate()));
+  if (!m[3] && parsed.getTime() > encounterUTC.getTime()) {
+    parsed.setUTCFullYear(parsed.getUTCFullYear() - 1);
+  }
+  parsed.setUTCHours(0, 0, 0, 0);
+  return new Date(parsed.toISOString().slice(0, 10));
+};
+
+const parseSurgeryDate = (note: string, encounterDate: Date): Date | null => {
+  const marker = /(surgery date|date of surgery|dos|d\/o\/s|sx date|date of procedure|status post|s\/p|post[-\s]?op|postoperative)/i;
+  if (!marker.test(note)) return null;
+  const nearbyPatterns = [
+    /(?:surgery date|date of surgery|dos|d\/o\/s|sx date|date of procedure)\s*[:\-]?\s*(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4})/gi,
+    /(?:status post|s\/p|post[-\s]?op|postoperative)[^\n\r]{0,80}?(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4})/gi,
+  ];
+  for (const pattern of nearbyPatterns) {
+    const match = pattern.exec(note);
+    if (match?.[1]) {
+      const dateText = match[1];
+      const parsed = parseNumericDate(dateText, encounterDate) || new Date(dateText);
+      if (parsed && !Number.isNaN(parsed.getTime())) {
+        parsed.setHours(0, 0, 0, 0);
+        return parsed;
+      }
+    }
+  }
+  const fallback = /(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4})/.exec(note);
+  if (!fallback?.[1]) return null;
+  return parseNumericDate(fallback[1], encounterDate);
 };
 
 const extractSignals = (rawNote: string, encounterDate?: string | null): SignalBundle => {
@@ -61,11 +101,11 @@ const extractSignals = (rawNote: string, encounterDate?: string | null): SignalB
   const minutesMatch = normalized.match(/(\d{1,3})\s*(min|minute)/);
   const minutes = minutesMatch ? Number(minutesMatch[1]) : 0;
 
-  const postopDetected = /(post[-\s]?op|status post|s\/p|global period)/.test(normalized);
-  const surgeryDate = parseSurgeryDate(rawNote);
+  const postopDetected = /(post[-\s]?op|postoperative|status post|s\/p|global period|follow[-\s]?up after surgery|after surgery)/.test(normalized);
   const encounter = encounterDate ? new Date(encounterDate) : new Date();
+  const surgeryDate = parseSurgeryDate(rawNote, encounter);
   const withinGlobalPeriod = (() => {
-    if (!postopDetected || !surgeryDate || Number.isNaN(encounter.getTime())) return false;
+    if (!surgeryDate || Number.isNaN(encounter.getTime())) return false;
     const diffDays = Math.floor((encounter.getTime() - surgeryDate.getTime()) / (1000 * 60 * 60 * 24));
     return diffDays >= 0 && diffDays <= 90;
   })();
@@ -105,8 +145,8 @@ const recommendCode = (
 } => {
   const rationale: string[] = [];
 
-  if (signals.postop_detected && signals.within_global_period) {
-    rationale.push("Encounter occurs within post-op global period.");
+  if (signals.within_global_period) {
+    rationale.push("Encounter occurs within post-op global period (90 days from surgery date).");
     return {
       suggested_code: "99024",
       confidence: "high",
@@ -122,40 +162,48 @@ const recommendCode = (
   }
   if (signals.chronic_condition_worsening) rationale.push("Chronic condition worsening/not at goal.");
 
-  let suggested = "99213";
+  const isNewPatient = String(patientType || "").toLowerCase() === "new";
+  let suggested = isNewPatient ? "99202" : "99213";
   if (
     (signals.risk_level === "moderate" || signals.prescription_drug_management) &&
     (signals.problems_addressed_count >= 2 || signals.chronic_condition_worsening) &&
     (signals.labs_reviewed + signals.imaging_reviewed + (signals.external_note_reviewed ? 1 : 0)) >= 2
   ) {
-    suggested = "99214";
+    suggested = isNewPatient ? "99203" : "99214";
   }
   if (
     signals.risk_level === "high" &&
     signals.problems_addressed_count >= 2 &&
     (signals.labs_reviewed + signals.imaging_reviewed + (signals.external_note_reviewed ? 1 : 0)) >= 2
   ) {
-    suggested = "99215";
+    suggested = isNewPatient ? "99204" : "99215";
   }
 
-  if (patientType === "new" && suggested === "99213") {
-    rationale.push("New patient context detected; recommendation remains conservative pending expanded rules.");
+  if (isNewPatient) {
+    rationale.push("New patient E/M pathway applied (99202-99204).");
+  }
+  rationale.push(
+    `Evidence summary: problems=${signals.problems_addressed_count}, data_elements=${signals.labs_reviewed + signals.imaging_reviewed + (signals.external_note_reviewed ? 1 : 0)}, risk=${signals.risk_level}.`,
+  );
+
+  if (isNewPatient && suggested === "99202") {
+    rationale.push("Conservative new-patient level selected pending stronger complexity evidence.");
   }
 
   const gaps: string[] = [];
-  if (!signals.prescription_drug_management && suggested !== "99213") {
+  if (!signals.prescription_drug_management && suggested !== "99213" && suggested !== "99202") {
     gaps.push("Clarify medication decision complexity.");
   }
-  if ((signals.labs_reviewed + signals.imaging_reviewed) === 0 && suggested !== "99213") {
+  if ((signals.labs_reviewed + signals.imaging_reviewed) === 0 && suggested !== "99213" && suggested !== "99202") {
     gaps.push("Document relevant data/lab/imaging review supporting complexity.");
   }
-  if (!signals.chronic_condition_worsening && suggested === "99214") {
+  if (!signals.chronic_condition_worsening && (suggested === "99214" || suggested === "99203")) {
     gaps.push("Clarify chronic condition status (worsening vs stable).");
   }
 
   return {
     suggested_code: suggested,
-    confidence: suggested === "99215" ? "medium" : "high",
+    confidence: suggested === "99215" || suggested === "99204" ? "medium" : "high",
     rationale,
     documentation_gap_text: gaps.length > 0 ? gaps.join(" ") : null,
   };
@@ -163,6 +211,9 @@ const recommendCode = (
 
 const fallbackRate = (code: string): number => {
   const map: Record<string, number> = {
+    "99202": 76,
+    "99203": 121,
+    "99204": 184,
     "99213": 95,
     "99214": 142,
     "99215": 206,
@@ -664,7 +715,7 @@ serve(async (req) => {
           if (r.current_user_selected_code === r.suggested_code) accepted += 1;
           else overridden += 1;
         }
-        if (r.suggested_code === "99214" || r.suggested_code === "99215") opportunities += 1;
+        if (["99203", "99204", "99214", "99215"].includes(r.suggested_code)) opportunities += 1;
         if (r.documentation_gap_text) {
           const key = r.documentation_gap_text.slice(0, 120);
           gapCounts[key] = (gapCounts[key] || 0) + 1;

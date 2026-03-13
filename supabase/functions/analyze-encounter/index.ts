@@ -21,7 +21,7 @@ type AnalyzeRequest = {
   };
 };
 
-const MODEL_VERSION = "rules-v1.3-context";
+const MODEL_VERSION = "rules-v1.4-context";
 
 const toDateOrNull = (value?: string | null): Date | null => {
   if (!value) return null;
@@ -102,7 +102,7 @@ const analyzeEncounterNote = (
   const normalized = (noteText || "").toLowerCase();
   const encounterDate = toDateOrNull(context?.encounterDate) || toDateOrNull(new Date().toISOString().slice(0, 10))!;
   const surgeryDate = toDateOrNull(context?.surgeryDate) || parseSurgeryDateFromNote(noteText || "", encounterDate);
-  const isPostOpLanguage = /(post[-\s]?op|status post|s\/p|global period)/.test(normalized);
+  const isPostOpLanguage = /(post[-\s]?op|postoperative|status post|s\/p|global period|follow[-\s]?up after surgery|after surgery)/.test(normalized);
   const hasDataReview = /(mri|x-?ray|ct|imaging|lab|reviewed records|independent historian)/.test(normalized);
   const hasProblemComplexity = /(chronic|worsening|exacerbation|persistent pain|multiple conditions)/.test(normalized);
   const hasManagementRisk = /(surgery|procedure|injection|prescription|medication management|opioid|high risk)/.test(normalized);
@@ -123,7 +123,7 @@ const analyzeEncounterNote = (
 
   // Global-period post-op protection:
   // If note is post-op and surgery date is within 90 days, visit should be 99024 (non-billable global follow-up).
-  if (surgeryDate && isPostOpLanguage) {
+  if (surgeryDate && (isPostOpLanguage || /follow[-\s]?up|f\/u/.test(normalized))) {
     const diffDays = Math.floor((encounterDate.getTime() - surgeryDate.getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays >= 0 && diffDays <= 90) {
       suggestedCode = "99024";
@@ -131,24 +131,31 @@ const analyzeEncounterNote = (
     }
   }
 
+  const isNewPatient = String(context?.patientType || "").toLowerCase() === "new";
+  if (suggestedCode !== "99024" && isNewPatient) {
+    suggestedCode = "99202";
+  }
   if (suggestedCode !== "99024") {
-  if (rationale.length >= 3) suggestedCode = "99214";
-  if (rationale.length >= 5 || (hasManagementRisk && hasDataReview && hasRiskDiscussion)) suggestedCode = "99215";
+    if (rationale.length >= 3) suggestedCode = isNewPatient ? "99203" : "99214";
+    if (rationale.length >= 5 || (hasManagementRisk && hasDataReview && hasRiskDiscussion)) suggestedCode = isNewPatient ? "99204" : "99215";
   }
 
   // Optional time-based path for established patient E/M (MVP scope 99213-99215).
   if (context?.codingPath === "time") {
     const minutes = Number(context?.totalMinutes || 0);
-    if (minutes >= 40) suggestedCode = "99215";
-    else if (minutes >= 30) suggestedCode = "99214";
-    else if (minutes >= 20) suggestedCode = "99213";
+    if (minutes >= 45) suggestedCode = isNewPatient ? "99204" : "99215";
+    else if (minutes >= 30) suggestedCode = isNewPatient ? "99203" : "99214";
+    else if (minutes >= 15) suggestedCode = isNewPatient ? "99202" : "99213";
     if (minutes > 0) {
       rationale.push(`Time-based coding path selected with ${minutes} documented minutes.`);
     }
   }
 
-  const codeRank: Record<string, number> = { "99213": 1, "99214": 2, "99215": 3 };
+  const codeRank: Record<string, number> = { "99202": 1, "99203": 2, "99204": 3, "99213": 1, "99214": 2, "99215": 3 };
   const perVisitDelta: Record<string, number> = {
+    "99202->99203": 45,
+    "99202->99204": 108,
+    "99203->99204": 63,
     "99213->99214": 58,
     "99213->99215": 132,
     "99214->99215": 74,
@@ -172,6 +179,10 @@ const analyzeEncounterNote = (
     gaps.push("Time-based path selected but total time is missing or below typical threshold.");
     suggestions.push("Document total clinician time spent on date of encounter if selecting time-based coding.");
   }
+
+  rationale.push(
+    `Evidence summary: data_review=${hasDataReview ? "yes" : "no"}, problem_complexity=${hasProblemComplexity ? "yes" : "no"}, risk_discussion=${hasRiskDiscussion ? "yes" : "no"}, management_risk=${hasManagementRisk ? "yes" : "no"}.`,
+  );
 
   const deltaKey = `${billedCode}->${suggestedCode}`;
   const estimatedDeltaPerVisit =

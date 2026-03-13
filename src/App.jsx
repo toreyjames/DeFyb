@@ -6918,13 +6918,14 @@ const TeamDashboard = ({ onBack }) => {
   );
 };
 
-const analyzeEncounterNote = (noteText, billedCode = "99213") => {
+const analyzeEncounterNote = (noteText, billedCode = "99213", context = {}) => {
   const normalized = (noteText || "").toLowerCase();
   const hasDataReview = /(mri|x-?ray|ct|imaging|lab|reviewed records|independent historian)/.test(normalized);
   const hasProblemComplexity = /(chronic|worsening|exacerbation|persistent pain|multiple conditions)/.test(normalized);
   const hasManagementRisk = /(surgery|procedure|injection|prescription|medication management|opioid|high risk)/.test(normalized);
   const hasRiskDiscussion = /(risk|benefit|shared decision|alternatives|informed consent)/.test(normalized);
   const hasFollowUpPlan = /(follow-up|return in|plan|next steps|monitor)/.test(normalized);
+  const isNewPatient = String(context?.patientType || "").toLowerCase() === "new";
 
   const rationale = [];
   if (hasDataReview) rationale.push("Reviewed external/internal diagnostic data (imaging/labs/history).");
@@ -6933,12 +6934,18 @@ const analyzeEncounterNote = (noteText, billedCode = "99213") => {
   if (hasRiskDiscussion) rationale.push("Risk/benefit discussion is documented for management choices.");
   if (hasFollowUpPlan) rationale.push("Assessment includes a clear ongoing treatment/follow-up plan.");
 
-  let suggestedCode = "99213";
-  if (rationale.length >= 3) suggestedCode = "99214";
-  if (rationale.length >= 5 || (hasManagementRisk && hasDataReview && hasRiskDiscussion)) suggestedCode = "99215";
+  let suggestedCode = isNewPatient ? "99202" : "99213";
+  if (rationale.length >= 3) suggestedCode = isNewPatient ? "99203" : "99214";
+  if (rationale.length >= 5 || (hasManagementRisk && hasDataReview && hasRiskDiscussion)) suggestedCode = isNewPatient ? "99204" : "99215";
+  rationale.push(
+    `Evidence summary: data_review=${hasDataReview ? "yes" : "no"}, problem_complexity=${hasProblemComplexity ? "yes" : "no"}, risk_discussion=${hasRiskDiscussion ? "yes" : "no"}, management_risk=${hasManagementRisk ? "yes" : "no"}.`,
+  );
 
-  const codeRank = { "99213": 1, "99214": 2, "99215": 3 };
+  const codeRank = { "99202": 1, "99203": 2, "99204": 3, "99213": 1, "99214": 2, "99215": 3 };
   const perVisitDelta = {
+    "99202->99203": 45,
+    "99202->99204": 108,
+    "99203->99204": 63,
     "99213->99214": 58,
     "99213->99215": 132,
     "99214->99215": 74,
@@ -7734,8 +7741,8 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
 
       let mapped = null;
       if (effectiveDemoMode) {
-        const local = analyzeEncounterNote(effectiveNote, billedCode);
-        const postopDetected = /(post[- ]?op|postoperative|global period|surgery follow-up)/i.test(effectiveNote);
+        const local = analyzeEncounterNote(effectiveNote, billedCode, encounterContext);
+        const postopDetected = /(post[- ]?op|postoperative|status post|s\/p|global period|surgery follow-up|follow-up after surgery|f\/u)/i.test(effectiveNote);
         if (postopDetected && surgeryDate && encounterDate) {
           const surgeryTs = new Date(surgeryDate).getTime();
           const encounterTs = new Date(encounterDate).getTime();
@@ -7946,7 +7953,7 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
     ...s,
     agreement: s.reviewed > 0 ? Math.round((s.agree / s.reviewed) * 100) : 0,
   }));
-  const activeModelVersion = history[0]?.modelVersion || analysis?.modelVersion || "rules-v1.3-context";
+  const activeModelVersion = history[0]?.modelVersion || analysis?.modelVersion || "rules-v1.4-context";
   const queuePendingCount = queueItems.filter((item) => item.status === "pending").length;
   const queueDoneCount = queueItems.filter((item) => item.status === "done").length;
   const qualityGate = (() => {
@@ -7965,7 +7972,13 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
     }
     if (!isGlobalPostOp && codingPath === "time") {
       const documentedMinutes = Number(totalMinutes || 0);
-      const minMinutes = suggestedCodeNum >= 99215 ? 40 : suggestedCodeNum >= 99214 ? 30 : 20;
+      const minMinutes = suggestedCodeNum >= 99215 || suggestedCodeNum === 99204
+        ? 45
+        : suggestedCodeNum >= 99214 || suggestedCodeNum === 99203
+          ? 30
+          : suggestedCodeNum === 99202
+            ? 15
+            : 20;
       if (!documentedMinutes || documentedMinutes < minMinutes) {
         hardStops.push(`Time-based coding selected but documented minutes are below ${minMinutes}.`);
       }
@@ -7973,7 +7986,7 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
     if (!isGlobalPostOp && analysis.suggestedCode !== billedCode && gaps.length > 0) {
       hardStops.push("Suggested code change has unresolved documentation gaps.");
     }
-    if (!isGlobalPostOp && suggestedCodeNum >= 99214) {
+    if (!isGlobalPostOp && (["99203", "99204", "99214", "99215"].includes(String(analysis.suggestedCode || "")))) {
       const evidenceSignals = [
         /problem|chronic|acute/.test(rationaleText),
         /medication|drug|risk/.test(rationaleText),
@@ -8684,6 +8697,9 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
                   }}
                 >
                   <option value="99024">99024</option>
+                  <option value="99202">99202</option>
+                  <option value="99203">99203</option>
+                  <option value="99204">99204</option>
                   <option value="99213">99213</option>
                   <option value="99214">99214</option>
                   <option value="99215">99215</option>
@@ -9116,6 +9132,9 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
                                 }}
                               >
                                 <option value="">Reviewer final code</option>
+                                <option value="99202">99202</option>
+                                <option value="99203">99203</option>
+                                <option value="99204">99204</option>
                                 <option value="99213">99213</option>
                                 <option value="99214">99214</option>
                                 <option value="99215">99215</option>

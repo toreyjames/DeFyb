@@ -7392,12 +7392,13 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
       if (effectiveDemoMode) return;
       const { data } = await supabase
         .from("billing_profiles")
-        .select("billing_status, plan_code, implementation_enabled, monthly_amount, stripe_subscription_id, licensed_provider_count, active_provider_count")
+        .select("billing_status, plan_code, implementation_enabled, monthly_amount, stripe_subscription_id, licensed_provider_count, active_provider_count, selected_addons, addon_setup_pending")
         .maybeSingle();
       if (data) {
         setBillingProfile(data);
         setProviderCount(Math.max(1, Number(data.licensed_provider_count || 1)));
         setActiveProviders(Math.max(1, Number(data.active_provider_count || data.licensed_provider_count || 1)));
+        if (Array.isArray(data.selected_addons)) setSelectedAddons(data.selected_addons);
       }
     };
     const loadClaimRequest = async () => {
@@ -7508,6 +7509,27 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
       active_provider_count: safeActive,
       licensed_provider_count: safeLicensed,
     }));
+  };
+
+  const markAddonSetupComplete = async (addonId) => {
+    if (!isSupabaseConfigured()) return;
+    const pending = Array.isArray(billingProfile?.addon_setup_pending) ? billingProfile.addon_setup_pending : [];
+    if (!pending.includes(addonId)) return;
+    const updatedPending = pending.filter((id) => id !== addonId);
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+    if (!user) return;
+    await supabase
+      .from("billing_profiles")
+      .upsert({
+        user_id: user.id,
+        email: user.email || "",
+        addon_setup_pending: updatedPending,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" });
+    setBillingProfile((prev) => ({ ...(prev || {}), addon_setup_pending: updatedPending }));
+    setCopied(`${addonId.replace("_", " ")} setup marked complete`);
+    setTimeout(() => setCopied(""), 1200);
   };
 
   const submitClinicClaimRequest = async () => {
@@ -7679,7 +7701,7 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
     }).then(async () => {
       const { data } = await supabase
         .from("billing_profiles")
-        .select("billing_status, plan_code, implementation_enabled, monthly_amount, stripe_subscription_id, licensed_provider_count, active_provider_count")
+        .select("billing_status, plan_code, implementation_enabled, monthly_amount, stripe_subscription_id, licensed_provider_count, active_provider_count, selected_addons, addon_setup_pending")
         .maybeSingle();
       if (data) setBillingProfile(data);
     }).catch(() => {
@@ -7884,6 +7906,8 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
   const corePerProviderRate = resolveCorePerProviderRate(providerCount);
   const coreMonthlyEstimate = calculateCoreMonthly(providerCount);
   const selectedAddonDetails = OPTIONAL_ADDONS.filter((addon) => selectedAddons.includes(addon.id));
+  const purchasedAddons = Array.isArray(billingProfile?.selected_addons) ? billingProfile.selected_addons : selectedAddons;
+  const addonSetupPending = Array.isArray(billingProfile?.addon_setup_pending) ? billingProfile.addon_setup_pending : [];
   const addonsMonthlyEstimate = selectedAddonDetails.reduce(
     (sum, addon) => sum + (addon.perProvider ? addon.monthly * providerCount : addon.monthly),
     0
@@ -8510,9 +8534,37 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
               )}
             </div>
           </div>
-          {selectedAddons.length > 0 && (
-            <div style={{ marginTop: "10px", fontSize: "12px", color: DS.colors.textDim }}>
-              Add-ons are selected and tracked in checkout metadata. If add-on Stripe prices are not yet configured, they can be activated after core subscription.
+          {purchasedAddons.length > 0 && (
+            <div style={{ marginTop: "10px", display: "grid", gap: "8px" }}>
+              <div style={{ fontSize: "12px", color: DS.colors.textDim }}>Add-on activation status</div>
+              {OPTIONAL_ADDONS.filter((addon) => purchasedAddons.includes(addon.id)).map((addon) => {
+                const pending = addonSetupPending.includes(addon.id);
+                return (
+                  <div
+                    key={addon.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "8px",
+                      fontSize: "12px",
+                      padding: "8px 10px",
+                      borderRadius: DS.radius.sm,
+                      border: `1px solid ${pending ? DS.colors.warn : DS.colors.vital}`,
+                      background: pending ? DS.colors.warnDim : DS.colors.vitalDim,
+                    }}
+                  >
+                    <span style={{ color: DS.colors.text }}>
+                      {addon.name}: {pending ? "Pending setup" : "Active"}
+                    </span>
+                    {pending && (
+                      <Button small onClick={() => markAddonSetupComplete(addon.id)}>
+                        Mark setup complete
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </Card>

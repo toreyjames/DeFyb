@@ -210,6 +210,8 @@ serve(async (req) => {
         licensed_provider_count: providerCount,
         active_provider_count: providerCount,
         monthly_amount: coreMonthly,
+        selected_addons: selectedAddons,
+        addon_setup_pending: selectedAddons,
         updated_at: new Date().toISOString(),
       });
 

@@ -11,6 +11,48 @@ const corsHeaders = {
 
 const encoder = new TextEncoder();
 
+const ADDON_LOOKUP_PREFIX_MAP: Record<string, string> = {
+  claims: "defyb_addon_claims_",
+  prior_auth: "defyb_addon_prior_auth_",
+  dme: "defyb_addon_dme_",
+  scribe_connector: "defyb_addon_scribe_connector_",
+};
+
+const CORE_LOOKUP_PREFIXES = [
+  "defyb_core_1_5_",
+  "defyb_core_6_20_",
+  "defyb_core_21_plus_",
+];
+
+const parseAddonCsv = (csv: string | undefined | null) => {
+  if (!csv) return [];
+  return csv
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+};
+
+const detectAddonsFromSubscriptionItems = (items: any[]) => {
+  const addons = new Set<string>();
+  for (const item of items || []) {
+    const lookup = String(item?.price?.lookup_key || "").toLowerCase();
+    if (!lookup) continue;
+    for (const [addonId, prefix] of Object.entries(ADDON_LOOKUP_PREFIX_MAP)) {
+      if (lookup.startsWith(prefix)) addons.add(addonId);
+    }
+  }
+  return Array.from(addons);
+};
+
+const detectLicensedProviderCountFromSubscriptionItems = (items: any[], fallback = 1) => {
+  const coreItem = (items || []).find((item) => {
+    const lookup = String(item?.price?.lookup_key || "").toLowerCase();
+    return CORE_LOOKUP_PREFIXES.some((prefix) => lookup.startsWith(prefix));
+  });
+  const qty = Number(coreItem?.quantity || 0);
+  return Math.max(1, qty || fallback || 1);
+};
+
 const parseStripeSignature = (header: string) => {
   const parts = header.split(",").map((part) => part.trim());
   const timestamp = parts.find((part) => part.startsWith("t="))?.slice(2);
@@ -97,6 +139,7 @@ serve(async (req) => {
         const subscriptionId = session.subscription || null;
         const customerEmail = session.customer_details?.email || null;
         const providerCount = Math.max(1, Number(session.metadata?.provider_count || 1));
+        const selectedAddons = parseAddonCsv(session.metadata?.selected_addons);
 
         if (customerId && customerEmail) {
           const userId = session.metadata?.user_id;
@@ -111,6 +154,8 @@ serve(async (req) => {
                 billing_status: "active",
                 licensed_provider_count: providerCount,
                 active_provider_count: providerCount,
+                selected_addons: selectedAddons,
+                addon_setup_pending: selectedAddons,
                 updated_at: new Date().toISOString(),
               }, { onConflict: "user_id" });
           }
@@ -245,14 +290,33 @@ serve(async (req) => {
       case "customer.subscription.updated": {
         const subscription = event.data.object;
         const subStatus = subscription.status || "active";
-        const monthlyAmount = (subscription.items?.data || []).reduce(
+        const subscriptionItems = (subscription.items?.data || []);
+        const { data: existingProfile } = await supabase
+          .from("billing_profiles")
+          .select("licensed_provider_count, selected_addons, addon_setup_pending")
+          .eq("stripe_customer_id", subscription.customer)
+          .maybeSingle();
+        const monthlyAmount = subscriptionItems.reduce(
           (sum: number, item: any) => sum + ((item.price?.unit_amount || 0) * (item.quantity || 1)),
           0,
         ) / 100;
-        const licensedProviderCount = (subscription.items?.data || []).reduce(
-          (sum: number, item: any) => sum + (item.quantity || 0),
-          0,
+        const selectedAddons = detectAddonsFromSubscriptionItems(subscriptionItems);
+        const licensedProviderCount = detectLicensedProviderCountFromSubscriptionItems(
+          subscriptionItems,
+          Number(existingProfile?.licensed_provider_count || 1),
         );
+        const priorPending = Array.isArray(existingProfile?.addon_setup_pending)
+          ? existingProfile.addon_setup_pending
+          : [];
+        const nextPending = priorPending.filter((addonId: string) => selectedAddons.includes(addonId));
+        const serializedItems = subscriptionItems.map((item: any) => ({
+          id: item.id,
+          quantity: item.quantity || 0,
+          price_id: item.price?.id || null,
+          lookup_key: item.price?.lookup_key || null,
+          recurring: Boolean(item.price?.recurring),
+          unit_amount: item.price?.unit_amount || 0,
+        }));
 
         // Update practice with subscription info
         await supabase
@@ -272,6 +336,9 @@ serve(async (req) => {
             billing_status: subStatus,
             monthly_amount: monthlyAmount || 299,
             licensed_provider_count: Math.max(1, licensedProviderCount || 1),
+            selected_addons: selectedAddons,
+            addon_setup_pending: nextPending,
+            stripe_subscription_items: serializedItems,
             updated_at: new Date().toISOString(),
           })
           .eq("stripe_customer_id", subscription.customer);
@@ -295,6 +362,9 @@ serve(async (req) => {
           .update({
             stripe_subscription_id: null,
             billing_status: "canceled",
+            selected_addons: [],
+            addon_setup_pending: [],
+            stripe_subscription_items: [],
             updated_at: new Date().toISOString(),
           })
           .eq("stripe_customer_id", subscription.customer);

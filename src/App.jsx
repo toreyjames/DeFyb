@@ -132,6 +132,23 @@ const TAGS = {
   revenue: { label: "Revenue", color: DS.colors.vital, bg: DS.colors.vitalDim, icon: "💰" },
 };
 
+const trackEvent = (eventName, props = {}) => {
+  if (typeof window === "undefined") return;
+  try {
+    if (typeof window.gtag === "function") {
+      window.gtag("event", eventName, props);
+    }
+    if (Array.isArray(window.dataLayer)) {
+      window.dataLayer.push({ event: eventName, ...props });
+    }
+    if (typeof window.plausible === "function") {
+      window.plausible(eventName, { props });
+    }
+  } catch {
+    // no-op
+  }
+};
+
 // --- FONTS LOADER ---
 const FontLoader = () => (
   <style>{`
@@ -3906,7 +3923,16 @@ const PublicSite = ({ onLogin, onClientLogin, onDemoStart }) => {
         <div onClick={handleLogoClick} style={{ cursor: "pointer" }}>
           <DeFybLogo size={28} />
         </div>
-        <Button primary small onClick={onClientLogin}>Login</Button>
+        <Button
+          primary
+          small
+          onClick={() => {
+            trackEvent("cta_practice_login_click", { surface: "home_nav" });
+            onClientLogin("home_nav");
+          }}
+        >
+          Login
+        </Button>
       </nav>
 
       <div style={{
@@ -3941,20 +3967,58 @@ const PublicSite = ({ onLogin, onClientLogin, onDemoStart }) => {
           </p>
           <HeartbeatLine width={220} style={{ margin: "0 auto 24px" }} />
           <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
-            <Button primary onClick={onClientLogin}>Login to Start the Tool →</Button>
-            <Button onClick={onDemoStart}>Try 2-Minute Demo (No Login)</Button>
-            <Button onClick={() => window.location.href = "mailto:torey@defyb.org?subject=DeFyb%20Practice%20Access"}>
+            <Button
+              primary
+              onClick={() => {
+                trackEvent("cta_practice_login_click", { surface: "home_hero" });
+                onClientLogin("home_hero");
+              }}
+            >
+              Login to Start the Tool →
+            </Button>
+            <Button
+              onClick={() => {
+                trackEvent("cta_demo_click", { surface: "home_hero" });
+                onDemoStart("home_hero");
+              }}
+            >
+              Try 2-Minute Demo (No Login)
+            </Button>
+            <Button
+              onClick={() => {
+                trackEvent("cta_practice_access_request_click", { surface: "home_hero" });
+                window.location.href = "mailto:torey@defyb.org?subject=DeFyb%20Practice%20Access";
+              }}
+            >
               Request Practice Access
             </Button>
           </div>
           <div style={{ marginTop: "12px", display: "flex", gap: "10px", justifyContent: "center", flexWrap: "wrap", fontSize: "12px" }}>
-            <span style={{ color: DS.colors.shock, cursor: "pointer" }} onClick={() => window.location.href = "/multi-clinic-provider-coding"}>
+            <span
+              style={{ color: DS.colors.shock, cursor: "pointer" }}
+              onClick={() => {
+                trackEvent("cta_related_page_click", { from: "home", to: "multi_clinic" });
+                window.location.href = "/multi-clinic-provider-coding";
+              }}
+            >
               Multi-clinic provider workflow
             </span>
-            <span style={{ color: DS.colors.shock, cursor: "pointer" }} onClick={() => window.location.href = "/orthopedic-coding-revenue-capture"}>
+            <span
+              style={{ color: DS.colors.shock, cursor: "pointer" }}
+              onClick={() => {
+                trackEvent("cta_related_page_click", { from: "home", to: "ortho_capture" });
+                window.location.href = "/orthopedic-coding-revenue-capture";
+              }}
+            >
               Orthopedic revenue capture
             </span>
-            <span style={{ color: DS.colors.shock, cursor: "pointer" }} onClick={() => window.location.href = "/small-practice-underbilling-tool"}>
+            <span
+              style={{ color: DS.colors.shock, cursor: "pointer" }}
+              onClick={() => {
+                trackEvent("cta_related_page_click", { from: "home", to: "underbilling_tool" });
+                window.location.href = "/small-practice-underbilling-tool";
+              }}
+            >
               Small-practice underbilling tool
             </span>
           </div>
@@ -4086,6 +4150,10 @@ const PublicSite = ({ onLogin, onClientLogin, onDemoStart }) => {
       }).catch(console.error);
 
       setSubmitted(true);
+      trackEvent("intake_submitted", {
+        source: "home_assessment",
+        specialty: form.specialty || "unknown",
+      });
     } catch (err) {
       console.error('Submission error:', err);
       setError('Something went wrong. Please try again or email us directly at torey@defyb.org');
@@ -7447,6 +7515,7 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
 
       if (insertError) throw insertError;
       if (data) setClaimRequest(data);
+      trackEvent("clinic_claim_submitted", { source: "practice_tool" });
       supabase.functions.invoke("clinic-claim-notify", {
         body: {
           event: "submitted",
@@ -7463,6 +7532,7 @@ const RevenueCaptureTool = ({ onBack, demoMode = false }) => {
         body: { claimRequestId: data?.id },
       });
       if (reviewResult?.autoApproved) {
+        trackEvent("clinic_claim_auto_approved", { source: "practice_tool" });
         if (data?.id) {
           supabase.functions.invoke("clinic-claim-activate", {
             body: { claimRequestId: data.id },
@@ -9565,6 +9635,7 @@ const PasswordResetView = ({ onDone }) => {
 // SEO LANDING PAGE
 // ============================================================
 const MarketingLandingPage = ({
+  pageKey,
   kicker,
   title,
   subtitle,
@@ -9586,8 +9657,25 @@ const MarketingLandingPage = ({
         <DeFybLogo size={28} />
       </div>
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-        <Button small onClick={onDemoStart}>Try Demo</Button>
-        <Button primary small onClick={onClientLogin}>Login</Button>
+        <Button
+          small
+          onClick={() => {
+            trackEvent("cta_demo_click", { surface: "seo_nav", page: pageKey });
+            onDemoStart(`seo_nav_${pageKey}`);
+          }}
+        >
+          Try Demo
+        </Button>
+        <Button
+          primary
+          small
+          onClick={() => {
+            trackEvent("cta_practice_login_click", { surface: "seo_nav", page: pageKey });
+            onClientLogin(`seo_nav_${pageKey}`);
+          }}
+        >
+          Login
+        </Button>
       </div>
     </nav>
 
@@ -9629,17 +9717,56 @@ const MarketingLandingPage = ({
         ))}
       </div>
       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "26px" }}>
-        <Button primary onClick={onDemoStart}>Try 2-Minute Demo</Button>
-        <Button onClick={onClientLogin}>Login to Start the Tool</Button>
+        <Button
+          primary
+          onClick={() => {
+            trackEvent("cta_demo_click", { surface: "seo_hero", page: pageKey });
+            onDemoStart(`seo_hero_${pageKey}`);
+          }}
+        >
+          Try 2-Minute Demo
+        </Button>
+        <Button
+          onClick={() => {
+            trackEvent("cta_practice_login_click", { surface: "seo_hero", page: pageKey });
+            onClientLogin(`seo_hero_${pageKey}`);
+          }}
+        >
+          Login to Start the Tool
+        </Button>
       </div>
       <div style={{ fontSize: "12px", color: DS.colors.textDim, marginBottom: "10px" }}>
         Related pages:
         {" "}
-        <span style={{ color: DS.colors.shock, cursor: "pointer" }} onClick={() => (window.location.href = "/multi-clinic-provider-coding")}>Multi-clinic providers</span>
+        <span
+          style={{ color: DS.colors.shock, cursor: "pointer" }}
+          onClick={() => {
+            trackEvent("cta_related_page_click", { from: pageKey, to: "multi_clinic" });
+            window.location.href = "/multi-clinic-provider-coding";
+          }}
+        >
+          Multi-clinic providers
+        </span>
         {" · "}
-        <span style={{ color: DS.colors.shock, cursor: "pointer" }} onClick={() => (window.location.href = "/orthopedic-coding-revenue-capture")}>Orthopedic coding</span>
+        <span
+          style={{ color: DS.colors.shock, cursor: "pointer" }}
+          onClick={() => {
+            trackEvent("cta_related_page_click", { from: pageKey, to: "ortho_capture" });
+            window.location.href = "/orthopedic-coding-revenue-capture";
+          }}
+        >
+          Orthopedic coding
+        </span>
         {" · "}
-        <span style={{ color: DS.colors.shock, cursor: "pointer" }} onClick={() => (window.location.href = "/small-practice-underbilling-tool")}>Underbilling tool</span>
+        <span
+          style={{ color: DS.colors.shock, cursor: "pointer" }}
+          onClick={() => {
+            trackEvent("cta_related_page_click", { from: pageKey, to: "underbilling_tool" });
+            window.location.href = "/small-practice-underbilling-tool";
+          }}
+        >
+          Underbilling tool
+        </span>
       </div>
 
       <Card>
@@ -9922,15 +10049,39 @@ export default function App() {
     const seoConfig = seoPages[currentView];
     const title = seoConfig?.title || "DeFyb — Defying the Death of Private Practice";
     const description = seoConfig?.description || "Revenue capture and coding intelligence for small practices.";
+    const canonicalPath = viewToUrl(currentView);
+    const canonicalUrl = `https://defyb.org${canonicalPath}`;
     document.title = title;
 
-    let metaDescription = document.querySelector('meta[name=\"description\"]');
-    if (!metaDescription) {
-      metaDescription = document.createElement("meta");
-      metaDescription.setAttribute("name", "description");
-      document.head.appendChild(metaDescription);
+    const upsertMeta = (selector, attr, attrValue, content) => {
+      let node = document.querySelector(selector);
+      if (!node) {
+        node = document.createElement("meta");
+        node.setAttribute(attr, attrValue);
+        document.head.appendChild(node);
+      }
+      node.setAttribute("content", content);
+    };
+
+    upsertMeta('meta[name="description"]', "name", "description", description);
+    upsertMeta('meta[property="og:title"]', "property", "og:title", title);
+    upsertMeta('meta[property="og:description"]', "property", "og:description", description);
+    upsertMeta('meta[property="og:type"]', "property", "og:type", "website");
+    upsertMeta('meta[property="og:url"]', "property", "og:url", canonicalUrl);
+    upsertMeta('meta[property="og:site_name"]', "property", "og:site_name", "DeFyb");
+    upsertMeta('meta[name="twitter:card"]', "name", "twitter:card", "summary_large_image");
+    upsertMeta('meta[name="twitter:title"]', "name", "twitter:title", title);
+    upsertMeta('meta[name="twitter:description"]', "name", "twitter:description", description);
+
+    let canonicalLink = document.querySelector('link[rel="canonical"]');
+    if (!canonicalLink) {
+      canonicalLink = document.createElement("link");
+      canonicalLink.setAttribute("rel", "canonical");
+      document.head.appendChild(canonicalLink);
     }
-    metaDescription.setAttribute("content", description);
+    canonicalLink.setAttribute("href", canonicalUrl);
+
+    trackEvent("page_view", { page: currentView, path: canonicalPath });
   }, [currentView]);
 
   const handleTeamLogin = (user) => {
@@ -9967,7 +10118,8 @@ export default function App() {
     setCurrentView('public');
   };
 
-  const handleRequestTeamAccess = () => {
+  const handleRequestTeamAccess = (source = "unknown") => {
+    trackEvent("cta_team_access_click", { source });
     if (teamUser) {
       setCurrentView('team');
     } else {
@@ -9975,7 +10127,8 @@ export default function App() {
     }
   };
 
-  const handleRequestPracticeAccess = () => {
+  const handleRequestPracticeAccess = (source = "unknown") => {
+    trackEvent("cta_practice_access_click", { source });
     if (practiceUser) {
       setCurrentView("tool");
     } else {
@@ -9983,7 +10136,8 @@ export default function App() {
     }
   };
 
-  const handleStartDemo = () => {
+  const handleStartDemo = (source = "unknown") => {
+    trackEvent("cta_demo_start_click", { source });
     setCurrentView("tool-demo");
   };
 
@@ -10030,6 +10184,7 @@ export default function App() {
       )}
       {(currentView === "seo-multi-clinic" || currentView === "seo-ortho-capture" || currentView === "seo-underbilling-tool") && (
         <MarketingLandingPage
+          pageKey={currentView}
           kicker={seoPages[currentView].kicker}
           title={seoPages[currentView].headline}
           subtitle={seoPages[currentView].subtitle}

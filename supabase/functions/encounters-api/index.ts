@@ -222,6 +222,12 @@ const fallbackRate = (code: string): number => {
   return map[code] ?? 0;
 };
 
+type RateLookupResult = {
+  amount: number;
+  source: "payer_specific" | "cms_pfs_active" | "fallback_table" | "static_fallback";
+  version: string | null;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -392,30 +398,75 @@ serve(async (req) => {
       const payerName = body.payer_name || "FALLBACK";
       const currentCode = body.current_code || "99213";
       const suggestedCode = recommendation.suggested_code;
-      const state = body.state || null;
+      const state = String(body.state || "").toUpperCase();
+      const locality = String(body.locality || "");
 
-      const rateQuery = async (code: string) => {
+      const { data: activeCmsVersion } = await client
+        .from("fee_schedule_versions")
+        .select("id, version")
+        .eq("source", "cms_pfs")
+        .eq("status", "active")
+        .order("effective_date", { ascending: false })
+        .order("imported_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const rateQuery = async (code: string): Promise<RateLookupResult> => {
         const { data: specific } = await client
           .from("payer_rates")
-          .select("allowed_amount, payer_name")
+          .select("allowed_amount, version")
           .eq("payer_name", payerName)
+          .in("source", ["manual", "payer_contract"])
+          .eq("state", state)
+          .eq("locality", locality)
           .eq("cpt_code", code)
           .order("effective_date", { ascending: false })
           .limit(1)
           .maybeSingle();
-        if (specific?.allowed_amount != null) return { amount: Number(specific.allowed_amount), source: "payer_specific" };
+        if (specific?.allowed_amount != null) {
+          return {
+            amount: Number(specific.allowed_amount),
+            source: "payer_specific",
+            version: specific.version || null,
+          };
+        }
+
+        if (activeCmsVersion?.id) {
+          const { data: cmsActive } = await client
+            .from("payer_rates")
+            .select("allowed_amount, version")
+            .eq("payer_name", "CMS_PFS")
+            .eq("source", "cms_pfs")
+            .eq("fee_schedule_version_id", activeCmsVersion.id)
+            .eq("state", state)
+            .eq("locality", locality)
+            .eq("cpt_code", code)
+            .order("effective_date", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (cmsActive?.allowed_amount != null) {
+            return {
+              amount: Number(cmsActive.allowed_amount),
+              source: "cms_pfs_active",
+              version: cmsActive.version || activeCmsVersion.version || null,
+            };
+          }
+        }
 
         const { data: fallback } = await client
           .from("payer_rates")
-          .select("allowed_amount")
+          .select("allowed_amount, version")
           .eq("payer_name", "FALLBACK")
+          .eq("source", "fallback")
           .eq("cpt_code", code)
           .order("effective_date", { ascending: false })
           .limit(1)
           .maybeSingle();
-        if (fallback?.allowed_amount != null) return { amount: Number(fallback.allowed_amount), source: "fallback_table" };
+        if (fallback?.allowed_amount != null) {
+          return { amount: Number(fallback.allowed_amount), source: "fallback_table", version: fallback.version || null };
+        }
 
-        return { amount: fallbackRate(code), source: "static_fallback" };
+        return { amount: fallbackRate(code), source: "static_fallback", version: null };
       };
 
       const currentRate = await rateQuery(currentCode);
@@ -430,9 +481,12 @@ serve(async (req) => {
         current_amount: currentRate.amount,
         suggested_amount: suggestedRate.amount,
         delta_amount: delta,
-        rate_source: currentRate.source === "payer_specific" || suggestedRate.source === "payer_specific"
-          ? "payer_specific"
-          : "fallback",
+        rate_source:
+          currentRate.source === "payer_specific" || suggestedRate.source === "payer_specific"
+            ? "payer_specific"
+            : currentRate.source === "cms_pfs_active" || suggestedRate.source === "cms_pfs_active"
+            ? "cms_pfs_active"
+            : "fallback",
       });
       if (revError) return json(400, { error: revError.message });
 
@@ -460,9 +514,14 @@ serve(async (req) => {
           current_amount: currentRate.amount,
           suggested_amount: suggestedRate.amount,
           delta_amount: delta,
-          rate_source: currentRate.source === "payer_specific" || suggestedRate.source === "payer_specific"
-            ? "payer_specific"
-            : "fallback",
+          rate_source:
+            currentRate.source === "payer_specific" || suggestedRate.source === "payer_specific"
+              ? "payer_specific"
+              : currentRate.source === "cms_pfs_active" || suggestedRate.source === "cms_pfs_active"
+              ? "cms_pfs_active"
+              : "fallback",
+          current_rate_version: currentRate.version,
+          suggested_rate_version: suggestedRate.version,
         },
       });
     }
@@ -736,6 +795,36 @@ serve(async (req) => {
         code_distribution: codeDistribution,
         top_documentation_gaps: topGaps,
       });
+    }
+
+    // DELETE /encounters/{id}/note — manual PHI purge (NULLs raw_note, keeps row)
+    if (req.method === "DELETE" && route.length === 3 && route[0] === "encounters" && route[2] === "note") {
+      const encounterId = route[1];
+
+      const { data: encounter, error: encounterError } = await client
+        .from("encounters")
+        .select("id, practice_id")
+        .eq("id", encounterId)
+        .single();
+      if (encounterError || !encounter) return json(404, { error: "Encounter not found" });
+      if (!hasPracticeAccess(encounter.practice_id)) return json(403, { error: "No access to practice" });
+
+      const { data: scrubbed, error: scrubError } = await client
+        .from("encounter_notes")
+        .update({ raw_note: null, normalized_note: null })
+        .eq("encounter_id", encounterId)
+        .not("raw_note", "is", null)
+        .select("id");
+      if (scrubError) return json(400, { error: scrubError.message });
+
+      const count = (scrubbed || []).length;
+
+      await emitAudit(encounter.practice_id, "note_manually_scrubbed", encounterId, {
+        notes_scrubbed: count,
+        reason: "manual_purge",
+      });
+
+      return json(200, { status: "ok", notes_scrubbed: count });
     }
 
     return json(404, { error: "Route not found" });

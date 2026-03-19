@@ -196,6 +196,233 @@ const templates: Record<string, { subject: string; getBody: (data: any) => strin
     `,
   },
 
+  // ============ ACTIVATION AGENT EMAILS ============
+
+  activation_first_analysis: {
+    subject: "Your first coding analysis is waiting",
+    getBody: (data) => `
+      <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #0b0c0e; padding: 24px; border-radius: 8px;">
+          <h1 style="color: #e8762b; font-size: 24px; margin: 0 0 16px;">Try your first encounter analysis</h1>
+          <p style="color: #e2e4e9; line-height: 1.6;">
+            Hi ${data.contact_name || "there"},
+          </p>
+          <p style="color: #8b8f9a; line-height: 1.6;">
+            You signed up for DeFyb but haven't analyzed an encounter yet. Here's how it works:
+          </p>
+          <div style="background: #111318; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p style="color: #e2e4e9; font-weight: 600; margin: 0 0 12px;">3 steps, 60 seconds:</p>
+            <ol style="color: #8b8f9a; margin: 0; padding-left: 20px; line-height: 2;">
+              <li>Paste any encounter note into the tool</li>
+              <li>Get the recommended E/M code with rationale</li>
+              <li>See exactly what revenue you may be missing</li>
+            </ol>
+          </div>
+          <p style="color: #8b8f9a; line-height: 1.6;">
+            Most practices find their first undercoded encounter in the first try.
+          </p>
+          <a href="https://defyb.org" style="display: inline-block; background: #e8762b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px;">
+            Analyze Your First Encounter
+          </a>
+        </div>
+      </div>
+    `,
+  },
+
+  activation_repeat_usage: {
+    subject: "You found something — keep going",
+    getBody: (data) => `
+      <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #0b0c0e; padding: 24px; border-radius: 8px;">
+          <h1 style="color: #e8762b; font-size: 24px; margin: 0 0 16px;">You've analyzed ${data.encounter_count} encounter${data.encounter_count !== 1 ? "s" : ""}</h1>
+          <p style="color: #e2e4e9; line-height: 1.6;">
+            Hi ${data.contact_name || "there"},
+          </p>
+          <p style="color: #8b8f9a; line-height: 1.6;">
+            You've already run ${data.encounter_count} encounter${data.encounter_count !== 1 ? "s" : ""} through DeFyb. Practices that analyze 10+ encounters in their first week find consistent patterns — and that's where the real revenue recovery starts.
+          </p>
+          <div style="background: #34d39922; border-left: 4px solid #34d399; padding: 12px 16px; margin: 20px 0;">
+            <p style="color: #34d399; font-weight: 600; margin: 0 0 4px;">Quick tip</p>
+            <p style="color: #8b8f9a; margin: 0; font-size: 14px;">
+              Try running a batch of 5 encounters from the same day. You'll see whether the pattern is provider-specific or practice-wide.
+            </p>
+          </div>
+          <a href="https://defyb.org" style="display: inline-block; background: #e8762b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px;">
+            Continue Analyzing
+          </a>
+        </div>
+      </div>
+    `,
+  },
+
+  activation_conversion: {
+    subject: "You've found ${data.estimated_recovery ? '$' + data.estimated_recovery.toLocaleString() : 'revenue'} in potential recovery",
+    getBody: (data) => `
+      <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #0b0c0e; padding: 24px; border-radius: 8px;">
+          <h1 style="color: #34d399; font-size: 24px; margin: 0 0 16px;">Your results so far</h1>
+          <p style="color: #e2e4e9; line-height: 1.6;">
+            Hi ${data.contact_name || "there"},
+          </p>
+          <p style="color: #8b8f9a; line-height: 1.6;">
+            You've analyzed ${data.encounter_count} encounters. Here's what DeFyb has found:
+          </p>
+          <div style="background: #111318; padding: 24px; border-radius: 8px; margin: 20px 0; text-align: center;">
+            <p style="color: #8b8f9a; font-size: 12px; margin: 0 0 8px;">ESTIMATED ANNUAL RECOVERY</p>
+            <p style="color: #34d399; font-size: 36px; font-weight: 600; margin: 0;">
+              $${(data.estimated_recovery || 0).toLocaleString()}
+            </p>
+            <p style="color: #8b8f9a; font-size: 13px; margin: 8px 0 0;">
+              Based on ${data.encounter_count} encounters analyzed
+            </p>
+          </div>
+          <p style="color: #8b8f9a; line-height: 1.6;">
+            Upgrade to track this over time, get ongoing coding recommendations for every encounter, and start recovering that revenue consistently.
+          </p>
+          <a href="https://defyb.org" style="display: inline-block; background: #34d399; color: #0b0c0e; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px;">
+            Start Your Subscription
+          </a>
+          <p style="color: #8b8f9a; font-size: 13px; margin-top: 16px;">
+            Starting at $299/provider/month. No implementation fee. Cancel anytime.
+          </p>
+        </div>
+      </div>
+    `,
+  },
+
+  // ============ UPSELL AGENT EMAILS ============
+
+  upsell_claims: {
+    subject: "Your encounter volume is ready for Claims AI",
+    getBody: (data) => `
+      <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #0b0c0e; padding: 24px; border-radius: 8px;">
+          <h1 style="color: #e8762b; font-size: 24px; margin: 0 0 16px;">Claims AI for ${data.practice_name || "your practice"}</h1>
+          <p style="color: #e2e4e9; line-height: 1.6;">Hi ${data.contact_name || "there"},</p>
+          <p style="color: #8b8f9a; line-height: 1.6;">${data.reason}</p>
+          <p style="color: #8b8f9a; line-height: 1.6;">
+            Claims AI automates claim scrubbing, reduces denials, and catches errors before submission. At your volume, it pays for itself in avoided rework.
+          </p>
+          <div style="background: #111318; padding: 16px; border-radius: 8px; margin: 20px 0; text-align: center;">
+            <p style="color: #e8762b; font-size: 20px; font-weight: 600; margin: 0;">+$99/provider/month</p>
+          </div>
+          <a href="https://defyb.org" style="display: inline-block; background: #e8762b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px;">
+            Enable Claims AI
+          </a>
+        </div>
+      </div>
+    `,
+  },
+
+  upsell_prior_auth: {
+    subject: "We found prior auth friction in your encounters",
+    getBody: (data) => `
+      <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #0b0c0e; padding: 24px; border-radius: 8px;">
+          <h1 style="color: #e8762b; font-size: 24px; margin: 0 0 16px;">Prior Auth Automation</h1>
+          <p style="color: #e2e4e9; line-height: 1.6;">Hi ${data.contact_name || "there"},</p>
+          <p style="color: #8b8f9a; line-height: 1.6;">${data.reason}</p>
+          <p style="color: #8b8f9a; line-height: 1.6;">
+            Prior Auth Automation handles the back-and-forth with payers so your staff doesn't have to. Less phone time, faster approvals, fewer delays.
+          </p>
+          <div style="background: #111318; padding: 16px; border-radius: 8px; margin: 20px 0; text-align: center;">
+            <p style="color: #e8762b; font-size: 20px; font-weight: 600; margin: 0;">+$149/provider/month</p>
+          </div>
+          <a href="https://defyb.org" style="display: inline-block; background: #e8762b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px;">
+            Enable Prior Auth
+          </a>
+        </div>
+      </div>
+    `,
+  },
+
+  upsell_dme: {
+    subject: "DME revenue opportunity detected",
+    getBody: (data) => `
+      <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #0b0c0e; padding: 24px; border-radius: 8px;">
+          <h1 style="color: #e8762b; font-size: 24px; margin: 0 0 16px;">DME Workflow</h1>
+          <p style="color: #e2e4e9; line-height: 1.6;">Hi ${data.contact_name || "there"},</p>
+          <p style="color: #8b8f9a; line-height: 1.6;">${data.reason}</p>
+          <p style="color: #8b8f9a; line-height: 1.6;">
+            The DME Workflow module helps you capture, track, and bill DME orders properly — closing a revenue gap most practices don't even realize they have.
+          </p>
+          <div style="background: #111318; padding: 16px; border-radius: 8px; margin: 20px 0; text-align: center;">
+            <p style="color: #e8762b; font-size: 20px; font-weight: 600; margin: 0;">+$199/provider/month</p>
+          </div>
+          <a href="https://defyb.org" style="display: inline-block; background: #e8762b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px;">
+            Enable DME Workflow
+          </a>
+        </div>
+      </div>
+    `,
+  },
+
+  upsell_scribe: {
+    subject: "Connect your scribe to DeFyb",
+    getBody: (data) => `
+      <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #0b0c0e; padding: 24px; border-radius: 8px;">
+          <h1 style="color: #e8762b; font-size: 24px; margin: 0 0 16px;">Scribe Connector</h1>
+          <p style="color: #e2e4e9; line-height: 1.6;">Hi ${data.contact_name || "there"},</p>
+          <p style="color: #8b8f9a; line-height: 1.6;">
+            Connect your AI scribe (Suki, Ambience, HealOS, etc.) directly to DeFyb. Encounter notes flow in automatically — no more copy/paste.
+          </p>
+          <div style="background: #111318; padding: 16px; border-radius: 8px; margin: 20px 0; text-align: center;">
+            <p style="color: #e8762b; font-size: 20px; font-weight: 600; margin: 0;">+$49/provider/month</p>
+          </div>
+          <a href="https://defyb.org" style="display: inline-block; background: #e8762b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px;">
+            Enable Scribe Connector
+          </a>
+        </div>
+      </div>
+    `,
+  },
+
+  // ============ CHURN PREVENTION EMAILS ============
+
+  churn_usage_drop: {
+    subject: "We noticed you haven't analyzed encounters recently",
+    getBody: (data) => `
+      <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #0b0c0e; padding: 24px; border-radius: 8px;">
+          <h1 style="color: #e8762b; font-size: 24px; margin: 0 0 16px;">Everything okay?</h1>
+          <p style="color: #e2e4e9; line-height: 1.6;">Hi ${data.contact_name || "there"},</p>
+          <p style="color: #8b8f9a; line-height: 1.6;">
+            It's been a while since ${data.practice_name || "your practice"} analyzed encounters in DeFyb. Every week without coding analysis is potential revenue left on the table.
+          </p>
+          <p style="color: #8b8f9a; line-height: 1.6;">
+            If something isn't working or you need help, just reply to this email. We're here.
+          </p>
+          <a href="https://defyb.org" style="display: inline-block; background: #e8762b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px;">
+            Resume Analyzing
+          </a>
+        </div>
+      </div>
+    `,
+  },
+
+  churn_inactive: {
+    subject: "Your DeFyb account misses you",
+    getBody: (data) => `
+      <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #0b0c0e; padding: 24px; border-radius: 8px;">
+          <h1 style="color: #e8762b; font-size: 24px; margin: 0 0 16px;">It's been a while</h1>
+          <p style="color: #e2e4e9; line-height: 1.6;">Hi ${data.contact_name || "there"},</p>
+          <p style="color: #8b8f9a; line-height: 1.6;">
+            You haven't logged in to DeFyb recently. Your coding intelligence is still running — here's what you might be missing.
+          </p>
+          <p style="color: #8b8f9a; line-height: 1.6;">
+            Need help with anything? Want a quick walkthrough of new features? Reply here and we'll set something up.
+          </p>
+          <a href="https://defyb.org" style="display: inline-block; background: #e8762b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px;">
+            Log In
+          </a>
+        </div>
+      </div>
+    `,
+  },
+
   invoice_overdue: {
     subject: "Payment Reminder - Action Required",
     getBody: (data) => `

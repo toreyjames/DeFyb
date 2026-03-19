@@ -1,4 +1,4 @@
-# DeFyb — Defying the Death of Private Practice
+# DeFyb — Defying the Death of Small Practices
 
 Clinician-led AI implementation platform for small group medical practices.
 Current MVP front-end is coding/revenue-capture-first.
@@ -40,3 +40,25 @@ Required Supabase secrets:
 - `STRIPE_PLATFORM_MINIMUM_PRICE_ID` (optional recurring clinic minimum line item)
 - `STRIPE_BASELINE_PRICE_ID` + `STRIPE_ADDITIONAL_PROVIDER_PRICE_ID` (legacy fallback)
 - `STRIPE_IMPLEMENTATION_PRICE_ID` (optional one-time implementation fee)
+
+## CMS Fee Schedule Import (Versioned)
+Use the importer to load CMS PFS rates into `payer_rates` with immutable version tracking in `fee_schedule_versions`.
+
+```bash
+SUPABASE_URL="https://<project>.supabase.co" \
+SUPABASE_SERVICE_ROLE_KEY="<service-role-key>" \
+CMS_PFS_FILE="./data/cms-pfs.csv" \
+CMS_PFS_VERSION="cms-2026.1" \
+CMS_EFFECTIVE_DATE="2026-01-01" \
+CMS_CODE_COLUMN="HCPCS Code" \
+CMS_AMOUNT_COLUMN="NonFacility Amount" \
+CMS_STATE_COLUMN="State" \
+CMS_LOCALITY_COLUMN="Locality" \
+CMS_ACTIVATE="true" \
+npm run cms:import
+```
+
+Notes:
+- By default import scope is `99202/99203/99204/99213/99214/99215/99024`.
+- Set `CMS_ALLOW_ALL_CODES=true` to import the full file.
+- `encounters-api` now prefers: payer-specific manual rates -> active CMS PFS version -> fallback rates.

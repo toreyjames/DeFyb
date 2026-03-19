@@ -1,6 +1,7 @@
 {
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/:path*" },
+    { "source": "/login", "destination": "/index.html" },
     { "source": "/tool", "destination": "/index.html" },
     { "source": "/tool/:path*", "destination": "/index.html" },
     { "source": "/team", "destination": "/index.html" },
@@ -10,6 +11,9 @@
     { "source": "/reset-password", "destination": "/index.html" },
     { "source": "/reset-password/:path*", "destination": "/index.html" },
     { "source": "/app", "destination": "/index.html" },
-    { "source": "/app/:path*", "destination": "/index.html" }
+    { "source": "/app/:path*", "destination": "/index.html" },
+    { "source": "/security", "destination": "/index.html" },
+    { "source": "/privacy", "destination": "/index.html" },
+    { "source": "/terms", "destination": "/index.html" }
   ]
 }

@@ -8,7 +8,8 @@
     "build": "vite build && node scripts/prerender-seo-routes.mjs",
     "preview": "vite preview",
     "smoke:encounters-api": "node scripts/smoke-encounters-api.mjs",
-    "smoke:auth-config": "node scripts/smoke-auth-config.mjs"
+    "smoke:auth-config": "node scripts/smoke-auth-config.mjs",
+    "cms:import": "node scripts/import-cms-pfs.mjs"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "^2.8.0",

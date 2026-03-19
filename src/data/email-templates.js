@@ -1,0 +1,16 @@
+export const EMAIL_TEMPLATES = {
+  welcome: { subject: "Welcome to DeFyb", trigger: "lead_created" },
+  quote_sent: { subject: "Your DeFyb Quote is Ready", trigger: "quote_sent" },
+  quote_followup_1: { subject: "Following Up on Your DeFyb Quote", trigger: "quote_no_response", delay: 2 },
+  quote_followup_2: { subject: "Still Interested in Transforming Your Practice?", trigger: "quote_no_response", delay: 5 },
+  quote_followup_3: { subject: "Last Chance: Your DeFyb Quote Expires Soon", trigger: "quote_no_response", delay: 10 },
+  payment_received: { subject: "Payment Received - Thank You!", trigger: "payment_succeeded" },
+  stage_change: { subject: "Update on Your DeFyb Transformation", trigger: "stage_change" },
+  tool_deployed: { subject: "New Tool Now Live!", trigger: "tool_active" },
+  scorecard: { subject: "Your Monthly Practice Scorecard", trigger: "monthly" },
+  invoice_due: { subject: "Payment Reminder: Invoice Due Soon", trigger: "invoice_due", delay: -3 },
+  invoice_overdue_1: { subject: "Payment Overdue - Action Required", trigger: "invoice_overdue", delay: 1 },
+  invoice_overdue_7: { subject: "Urgent: Payment 7 Days Overdue", trigger: "invoice_overdue", delay: 7 },
+  renewal_60: { subject: "Your DeFyb Partnership Renewal", trigger: "contract_expiring", delay: -60 },
+  renewal_30: { subject: "30 Days Until Renewal", trigger: "contract_expiring", delay: -30 },
+};

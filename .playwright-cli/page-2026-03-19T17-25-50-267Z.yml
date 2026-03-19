@@ -1,0 +1,28 @@
+- generic [ref=e7]:
+  - generic [ref=e8]:
+    - generic [ref=e9]:
+      - img [ref=e10]
+      - generic [ref=e13]: DeFyb
+    - heading "Welcome to DeFyb" [level=1] [ref=e14]
+    - paragraph [ref=e15]: Sign in or get started — same door for everyone.
+  - generic [ref=e16] [cursor=pointer]:
+    - generic [ref=e17]: ⚡
+    - generic [ref=e18]:
+      - generic [ref=e19]: New here? Try the instant demo
+      - generic [ref=e20]: See the revenue tool in action — no account needed.
+  - generic [ref=e21]:
+    - button "Continue with Google" [ref=e22] [cursor=pointer]:
+      - img [ref=e23]
+      - text: Continue with Google
+    - button "Continue with Microsoft" [ref=e28] [cursor=pointer]:
+      - img [ref=e29]
+      - text: Continue with Microsoft
+  - generic [ref=e36]: or use email
+  - generic [ref=e38]:
+    - generic [ref=e39]: Email
+    - textbox "you@clinic.com" [active] [ref=e40]
+  - generic [ref=e41]:
+    - button "Continue with email" [ref=e42] [cursor=pointer]
+    - paragraph [ref=e43]: We'll email you a sign-in link — no password needed.
+    - paragraph [ref=e44]: Use password instead
+  - generic [ref=e45]: ← Back to site

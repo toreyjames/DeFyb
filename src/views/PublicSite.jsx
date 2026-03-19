@@ -160,40 +160,37 @@ export const PublicSite = ({ onLogin, onClientLogin, onDemoStart }) => {
           }}>
             <Card style={{ textAlign: "left", padding: "16px" }}>
               <div style={{ fontSize: "11px", color: DS.colors.textDim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                Baseline Plan
-              </div>
-              <div style={{ fontFamily: DS.fonts.display, fontSize: "30px", lineHeight: 1.1, margin: "6px 0" }}>
-                $299<span style={{ fontSize: "16px", color: DS.colors.textMuted }}>/provider/mo</span>
-              </div>
-              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
-                Tiered core pricing: $299 (1-5), $279 (6-20), $249 (21+) with a $599 clinic minimum.
-              </div>
-              <div style={{ marginTop: "10px", fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase", color: DS.colors.shock }}>
-                One-time core implementation: $2,500
-              </div>
-            </Card>
-
-            <Card style={{ textAlign: "left", padding: "16px" }}>
-              <div style={{ fontSize: "11px", color: DS.colors.textDim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                Typical ROI Range
+                Pilot Program
               </div>
               <div style={{ fontFamily: DS.fonts.display, fontSize: "30px", lineHeight: 1.1, margin: "6px 0", color: DS.colors.vital }}>
-                10x-30x
+                Free
               </div>
               <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
-                Based on underbilling recovery signal in early reviews and faster billing clarification.
+                We're onboarding early practices at no cost. Sign up, use the tool, and help us build something that works.
               </div>
             </Card>
 
             <Card style={{ textAlign: "left", padding: "16px" }}>
               <div style={{ fontSize: "11px", color: DS.colors.textDim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                Optional Add-Ons
+                What You Get
               </div>
               <div style={{ fontFamily: DS.fonts.display, fontSize: "24px", lineHeight: 1.1, margin: "8px 0 10px" }}>
-                Claims, Prior Auth, DME, Scribe Connector
+                Coding intelligence on every encounter
               </div>
               <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
-                Claims $99, Prior Auth $149, DME $199, Scribe Connector $49 (all per provider/month).
+                Paste a note, see underbilling, get evidence-backed suggestions. Full access during pilot.
+              </div>
+            </Card>
+
+            <Card style={{ textAlign: "left", padding: "16px" }}>
+              <div style={{ fontSize: "11px", color: DS.colors.textDim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                What We Ask
+              </div>
+              <div style={{ fontFamily: DS.fonts.display, fontSize: "24px", lineHeight: 1.1, margin: "8px 0 10px" }}>
+                Use it and tell us what's broken
+              </div>
+              <div style={{ fontSize: "13px", color: DS.colors.textMuted }}>
+                Your feedback shapes the product. No contracts, no commitments.
               </div>
             </Card>
           </div>

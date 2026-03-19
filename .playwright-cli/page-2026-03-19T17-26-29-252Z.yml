@@ -1,0 +1,72 @@
+- generic [ref=e46]:
+  - navigation [ref=e47]:
+    - generic [ref=e49]:
+      - img [ref=e50]
+      - generic [ref=e53]: DeFyb
+    - generic [ref=e54] [cursor=pointer]: Exit Demo
+  - generic [ref=e55]:
+    - generic [ref=e56]:
+      - heading "Revenue Capture Tool" [level=2] [ref=e57]
+      - paragraph [ref=e58]: Paste encounter documentation and get billing intelligence in seconds.
+    - generic [ref=e59]: "Clinic-safe mode: encounter notes in this tool are not sent to analytics."
+    - generic [ref=e60]: You're in demo mode — results are instant but not saved.Create a free account to save your results →
+    - generic [ref=e61]:
+      - button "Show Queue Mode" [ref=e62] [cursor=pointer]
+      - button "Show Advanced Review" [ref=e63] [cursor=pointer]
+    - generic [ref=e64]:
+      - generic [ref=e65]:
+        - generic [ref=e66]: Encounter Note
+        - textbox "Paste clinical note or transcript..." [ref=e67]
+        - generic [ref=e68]: "Shortcuts: Ctrl/Cmd + Enter analyze · Ctrl/Cmd + Shift + Enter finalize"
+        - generic [ref=e69]:
+          - button "Load Ortho Example" [ref=e70] [cursor=pointer]
+          - button "Load Primary Care Example" [ref=e71] [cursor=pointer]
+        - generic [ref=e72]:
+          - generic [ref=e73]:
+            - generic [ref=e74]: Currently billed code
+            - combobox [ref=e75]:
+              - option "99024"
+              - option "99202"
+              - option "99203"
+              - option "99204"
+              - option "99213" [selected]
+              - option "99214"
+              - option "99215"
+          - generic [ref=e76]:
+            - generic [ref=e77]: Encounter Date
+            - textbox [ref=e78]: 2026-03-19
+          - generic [ref=e79]:
+            - generic [ref=e80]: Surgery Date (optional)
+            - textbox [ref=e81]
+          - generic [ref=e82]:
+            - generic [ref=e83]: Specialty
+            - combobox [ref=e84]:
+              - option "General" [selected]
+              - option "Orthopedics"
+              - option "Family Medicine"
+              - option "Internal Medicine"
+              - option "Pain Management"
+          - generic [ref=e85]:
+            - generic [ref=e86]: Patient Type
+            - combobox [ref=e87]:
+              - option "Established" [selected]
+              - option "New"
+          - generic [ref=e88]:
+            - generic [ref=e89]: POS
+            - combobox [ref=e90]:
+              - option "Office" [selected]
+              - option "Hospital"
+              - option "Telehealth"
+          - generic [ref=e91]:
+            - generic [ref=e92]: Coding Path
+            - combobox [ref=e93]:
+              - option "MDM" [selected]
+              - option "Time"
+          - generic [ref=e94]:
+            - checkbox "Telehealth encounter" [ref=e95]
+            - text: Telehealth encounter
+          - generic [ref=e96]:
+            - checkbox "Conservative demo mode (reduces high-level suggestions without strong evidence)" [checked] [ref=e97]
+            - text: Conservative demo mode (reduces high-level suggestions without strong evidence)
+          - button "Analyze Encounter" [ref=e98] [cursor=pointer]
+      - generic [ref=e100]: No analysis yet. Run encounter analysis to generate a suggested code, rationale, documentation gaps, and recovery estimate.

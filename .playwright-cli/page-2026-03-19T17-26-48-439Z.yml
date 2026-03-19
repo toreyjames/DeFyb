@@ -1,0 +1,33 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e6] [cursor=pointer]:
+      - img [ref=e7]
+      - generic [ref=e10]: DeFyb
+    - button "Login" [ref=e11] [cursor=pointer]
+  - generic [ref=e13]:
+    - generic [ref=e14]: Revenue Capture OS for Private Practices
+    - heading "Defying the death of small practices." [level=1] [ref=e15]
+    - paragraph [ref=e16]: DeFyb catches underbilling from encounter documentation and shows exactly what to fix, so doctors protect margin without adding clicks.
+    - img [ref=e17]
+    - generic [ref=e19]:
+      - button "Login to Start the Tool →" [ref=e20] [cursor=pointer]
+      - button "Try 2-Minute Demo (No Login)" [ref=e21] [cursor=pointer]
+      - button "Request Practice Access" [ref=e22] [cursor=pointer]
+    - generic [ref=e23]:
+      - generic [ref=e24] [cursor=pointer]: Multi-clinic provider workflow
+      - generic [ref=e25] [cursor=pointer]: Orthopedic revenue capture
+      - generic [ref=e26] [cursor=pointer]: Small-practice underbilling tool
+    - generic [ref=e27]:
+      - generic [ref=e28]:
+        - generic [ref=e29]: Baseline Plan
+        - generic [ref=e30]: $299/provider/mo
+        - generic [ref=e31]: "Tiered core pricing: $299 (1-5), $279 (6-20), $249 (21+) with a $599 clinic minimum."
+        - generic [ref=e32]: "One-time core implementation: $2,500"
+      - generic [ref=e33]:
+        - generic [ref=e34]: Typical ROI Range
+        - generic [ref=e35]: 10x-30x
+        - generic [ref=e36]: Based on underbilling recovery signal in early reviews and faster billing clarification.
+      - generic [ref=e37]:
+        - generic [ref=e38]: Optional Add-Ons
+        - generic [ref=e39]: Claims, Prior Auth, DME, Scribe Connector
+        - generic [ref=e40]: Claims $99, Prior Auth $149, DME $199, Scribe Connector $49 (all per provider/month).

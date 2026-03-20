@@ -18,8 +18,8 @@ export const Login = ({ onLogin, onBack, onDemoStart, audience }) => {
   const [notice, setNotice] = useState(null);
   const [oauthUnavailable, setOauthUnavailable] = useState({ google: false, azure: false });
 
-  const showGoogleAuth = import.meta.env.VITE_ENABLE_GOOGLE_AUTH !== "false";
-  const showMicrosoftAuth = import.meta.env.VITE_ENABLE_MICROSOFT_AUTH !== "false";
+  const showGoogleAuth = import.meta.env.VITE_ENABLE_GOOGLE_AUTH === "true";
+  const showMicrosoftAuth = import.meta.env.VITE_ENABLE_MICROSOFT_AUTH === "true";
 
   const redirectParam = audience === "team" ? "team=1" : "tool=1";
 
